@@ -1,0 +1,137 @@
+.reader-page {
+  min-height: 100vh;
+  background: #1a1a1a;
+  color: #fff;
+}
+
+.reader-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  gap: 1rem;
+}
+
+.reader-loading .spinner {
+  width: 50px;
+  height: 50px;
+  border: 4px solid rgba(255, 255, 255, 0.2);
+  border-top-color: #b8860b;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+.reader-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  gap: 1.5rem;
+  text-align: center;
+  padding: 2rem;
+}
+
+.reader-error h2 {
+  color: #ff6b6b;
+  font-size: 1.5rem;
+}
+
+.reader-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2rem;
+  padding: 1rem 2rem;
+  background: #0a0a0a;
+  border-bottom: 1px solid #333;
+}
+
+.reader-watermark {
+  font-size: 0.75rem;
+  color: #666;
+  padding: 0.25rem 0.75rem;
+  background: rgba(184, 134, 11, 0.1);
+  border: 1px solid rgba(184, 134, 11, 0.3);
+  border-radius: 4px;
+}
+
+.btn-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  background: #b8860b;
+  color: #fff;
+  text-decoration: none;
+  border-radius: 8px;
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+.btn-back:hover {
+  background: #d4a617;
+  transform: translateX(-2px);
+}
+
+.reader-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #fff;
+}
+
+.reader-container {
+  display: flex;
+  justify-content: center;
+  padding: 2rem;
+  min-height: calc(100vh - 200px);
+}
+
+.pdf-viewer {
+  width: 100%;
+  max-width: 900px;
+  height: calc(100vh - 200px);
+  border: none;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.reader-footer {
+  text-align: center;
+  padding: 1rem;
+  background: #0a0a0a;
+  border-top: 1px solid #333;
+  color: #888;
+}
+
+.reader-protected {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  color: #b8860b;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+@media (max-width: 768px) {
+  .reader-header {
+    flex-direction: column;
+    gap: 1rem;
+    text-align: center;
+  }
+
+  .reader-watermark {
+    font-size: 0.65rem;
+  }
+
+  .reader-container {
+    padding: 1rem;
+  }
+
+  .pdf-viewer {
+    height: calc(100vh - 250px);
+  }
+}
