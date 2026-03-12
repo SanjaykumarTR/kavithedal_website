@@ -2,7 +2,6 @@
 Views for Orders App - Order management and Razorpay payment integration.
 """
 import logging
-import razorpay
 from django.conf import settings
 from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
@@ -19,6 +18,14 @@ def _razorpay_configured():
     return bool(
         getattr(settings, 'RAZORPAY_KEY_ID', '') and
         getattr(settings, 'RAZORPAY_KEY_SECRET', '')
+    )
+
+
+def _get_razorpay_client():
+    """Lazy import razorpay client only when needed."""
+    import razorpay
+    return razorpay.Client(
+        auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET)
     )
 
 from .models import Order, Payment, UserLibrary, DeliveryZone, EbookPurchase
