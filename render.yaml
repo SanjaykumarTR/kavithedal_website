@@ -40,12 +40,14 @@ services:
         value: "False"
 
       - key: ALLOWED_HOSTS
-        # Will be updated automatically with the Render hostname;
-        # add your custom domain here when ready.
+        # After first deploy, update this in the Render dashboard to include
+        # your actual service hostname, e.g.:
+        # kavithedal-api.onrender.com,localhost,127.0.0.1
+        # settings.py also auto-appends RENDER_EXTERNAL_HOSTNAME.
         value: "localhost,127.0.0.1"
 
       - key: PYTHON_VERSION
-        value: "3.12.0"
+        value: "3.13.0"
 
       # ── Database ──────────────────────────────────────────────────────────
       - key: DATABASE_URL

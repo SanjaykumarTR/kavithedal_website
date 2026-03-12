@@ -10,6 +10,8 @@ export default function AdminDashboard() {
   const [stats, setStats] = useState({
     books: 0,
     authors: 0,
+    orders: 0,
+    pendingOrders: 0,
     testimonials: 0,
     pendingTestimonials: 0,
     contests: 0,
@@ -21,10 +23,12 @@ export default function AdminDashboard() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [booksRes, authorsRes, testimonialsRes, pendingRes, contestsRes] =
+        const [booksRes, authorsRes, ordersRes, pendingOrdersRes, testimonialsRes, pendingRes, contestsRes] =
           await Promise.all([
             api.get("/api/books/?page_size=5"),
             api.get("/api/authors/"),
+            api.get("/api/orders/orders/"),
+            api.get("/api/orders/orders/?status=pending"),
             api.get("/api/testimonials/"),
             api.get("/api/testimonials/?status=pending"),
             api.get("/api/contests/?is_active=true"),
@@ -33,6 +37,8 @@ export default function AdminDashboard() {
         setStats({
           books: booksRes.data.count ?? booksRes.data.length ?? 0,
           authors: authorsRes.data.count ?? authorsRes.data.length ?? 0,
+          orders: ordersRes.data.count ?? ordersRes.data.length ?? 0,
+          pendingOrders: pendingOrdersRes.data.count ?? pendingOrdersRes.data.length ?? 0,
           testimonials: testimonialsRes.data.count ?? testimonialsRes.data.length ?? 0,
           pendingTestimonials: pendingRes.data.count ?? pendingRes.data.length ?? 0,
           contests: contestsRes.data.count ?? contestsRes.data.length ?? 0,
@@ -53,6 +59,8 @@ export default function AdminDashboard() {
   }, []);
 
   const statCards = [
+    { key: "orders", label: t("dashboard", "totalOrders"), icon: "📦", color: "teal" },
+    { key: "pendingOrders", label: t("dashboard", "pendingOrders"), icon: "⏰", color: "yellow" },
     { key: "books", label: t("dashboard", "totalBooks"), icon: "📚", color: "blue" },
     { key: "authors", label: t("dashboard", "totalAuthors"), icon: "✍️", color: "green" },
     { key: "testimonials", label: t("dashboard", "testimonials"), icon: "💬", color: "orange" },

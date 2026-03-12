@@ -1,6 +1,7 @@
 """
 Views for Orders App - Order management and Razorpay payment integration.
 """
+import logging
 import razorpay
 from django.conf import settings
 from rest_framework import viewsets, permissions, status
@@ -9,6 +10,16 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.utils import timezone
 from django.db import transaction
+
+logger = logging.getLogger('apps')
+
+
+def _razorpay_configured():
+    """Return True when both Razorpay credentials are set in the environment."""
+    return bool(
+        getattr(settings, 'RAZORPAY_KEY_ID', '') and
+        getattr(settings, 'RAZORPAY_KEY_SECRET', '')
+    )
 
 from .models import Order, Payment, UserLibrary, DeliveryZone, EbookPurchase
 from .serializers import (
@@ -50,9 +61,16 @@ class OrderViewSet(viewsets.ModelViewSet):
     
     @action(detail=True, methods=['post'])
     def simulate_payment(self, request, pk=None):
-        """Simulate payment for an order - no actual payment required."""
+        """Simulate payment — development/testing only. Blocked in production."""
+        # Refuse simulation when real Razorpay credentials are present
+        if _razorpay_configured():
+            return Response(
+                {'error': 'Payment simulation is not available when Razorpay is configured.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
         order = self.get_object()
-        
+
         if order.status != 'pending':
             return Response(
                 {'error': 'Payment already processed or cancelled'},
