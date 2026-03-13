@@ -9,8 +9,6 @@ export default function Books() {
   const { language } = useContext(LanguageContext);
   const [searchParams] = useSearchParams();
 
-  const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000";
-
   const [books, setBooks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);

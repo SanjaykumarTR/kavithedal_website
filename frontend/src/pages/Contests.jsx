@@ -4,13 +4,12 @@ import api from "../api/axios";
 import { LanguageContext } from "../context/LanguageContext";
 import "../styles/blog.css";
 
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000";
-
 export default function Contests() {
   const { language } = useContext(LanguageContext);
   const [contests, setContests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("active");
+  const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
   // Translations
   const translations = {

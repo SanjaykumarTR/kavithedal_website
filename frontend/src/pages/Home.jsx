@@ -13,15 +13,11 @@ export default function Home() {
   const [books, setBooks] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000";
-
   useEffect(() => {
     const fetchBooks = async () => {
       try {
         const response = await api.get("/api/books/");
-        console.log("API Response:", response.data);
         const booksData = response.data.results || response.data;
-        console.log("Books data:", booksData);
         setBooks(booksData);
       } catch (err) {
         console.error("Error fetching books:", err);
