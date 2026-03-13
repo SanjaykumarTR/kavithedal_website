@@ -16,6 +16,14 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / '.env')
 
 
+# ─── Cloudinary — check early so INSTALLED_APPS can be built conditionally ────
+_cloudinary_configured = bool(
+    os.environ.get('CLOUDINARY_CLOUD_NAME') and
+    os.environ.get('CLOUDINARY_API_KEY') and
+    os.environ.get('CLOUDINARY_API_SECRET')
+)
+
+
 # ─── Core Security ────────────────────────────────────────────────────────────
 
 # Never commit a real secret key. Generate one with:
@@ -50,8 +58,6 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt.token_blacklist',
     'corsheaders',
     'django_filters',
-    'cloudinary',
-    'cloudinary_storage',
 
     # Local apps
     'apps.accounts',
@@ -61,6 +67,11 @@ INSTALLED_APPS = [
     'apps.contests',
     'apps.orders',
 ]
+
+# Cloudinary apps only loaded when credentials are present — avoids startup
+# crash when CLOUDINARY_* env vars are not yet configured.
+if _cloudinary_configured:
+    INSTALLED_APPS += ['cloudinary', 'cloudinary_storage']
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -310,11 +321,7 @@ LOGGING = {
 # Render filesystem is ephemeral — Cloudinary keeps book covers, PDFs, and
 # author photos alive across redeploys.
 # Set CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET in env.
-_cloudinary_configured = bool(
-    os.environ.get('CLOUDINARY_CLOUD_NAME') and
-    os.environ.get('CLOUDINARY_API_KEY') and
-    os.environ.get('CLOUDINARY_API_SECRET')
-)
+# (_cloudinary_configured is computed near the top of this file, before INSTALLED_APPS)
 
 if _cloudinary_configured:
     CLOUDINARY_STORAGE = {
