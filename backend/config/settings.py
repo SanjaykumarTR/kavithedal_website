@@ -7,7 +7,7 @@ import dj_database_url
 from pathlib import Path
 from datetime import timedelta
 from dotenv import load_dotenv
-
+from corsheaders.defaults import default_headers
 # ─── Base directory ───────────────────────────────────────────────────────────
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -327,7 +327,3 @@ if _cloudinary_configured:
     MEDIA_URL = 'https://res.cloudinary.com/{}/'.format(
         os.environ.get('CLOUDINARY_CLOUD_NAME')
     )
-CORS_ALLOWED_ORIGINS = [
-    
-    "https://kavithedal-website-1gc7.onrender.com/"
-]
