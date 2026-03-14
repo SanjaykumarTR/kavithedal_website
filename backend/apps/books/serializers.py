@@ -1,9 +1,13 @@
 """
 Serializers for Books App.
 """
+import logging
+from django.conf import settings
 from rest_framework import serializers
 from .models import Book, Category, BookSubmission, ContactMessage
 from apps.authors.serializers import AuthorSerializer, AuthorListSerializer
+
+logger = logging.getLogger('apps')
 
 
 class CategorySerializer(serializers.ModelSerializer):
@@ -21,17 +25,52 @@ class CategorySerializer(serializers.ModelSerializer):
         return obj.books.count()
 
 
-def _file_url(field_file, request=None):
+def _cloudinary_url(name, resource_type='image'):
+    """Construct a Cloudinary URL directly from the stored field name."""
+    cloud = getattr(settings, 'CLOUDINARY_STORAGE', {}).get('CLOUD_NAME', '')
+    if not cloud or not name:
+        return None
+    clean = str(name).lstrip('/')
+    if clean.startswith('http://') or clean.startswith('https://'):
+        return clean  # already absolute
+    if clean.startswith('media/'):
+        clean = clean[6:]
+    return f'https://res.cloudinary.com/{cloud}/{resource_type}/upload/{clean}'
+
+
+def _file_url(field_file, request=None, resource_type='image'):
     """Return an absolute URL for any storage-backed file field.
     Works for both Cloudinary (already-absolute URLs) and local /media/ paths."""
     if not field_file:
         return None
+
+    stored_name = None
+    try:
+        stored_name = field_file.name
+    except Exception:
+        pass
+
+    # If the stored value itself is already an absolute URL
+    if stored_name and isinstance(stored_name, str):
+        if stored_name.startswith('http://') or stored_name.startswith('https://'):
+            return stored_name
+
     try:
         url = field_file.url          # uses the configured storage backend
-    except Exception:
-        return None
+    except Exception as e:
+        logger.warning('_file_url: .url raised %s for field %s; trying Cloudinary fallback', e, stored_name)
+        return _cloudinary_url(stored_name, resource_type)
+
+    logger.debug('_file_url: stored=%s  url=%s', stored_name, url)
+
     if url.startswith("http://") or url.startswith("https://"):
         return url                    # Cloudinary / any absolute URL — return as-is
+
+    # Relative URL from local storage — try Cloudinary fallback first
+    fallback = _cloudinary_url(stored_name, resource_type)
+    if fallback:
+        return fallback
+
     if request is not None:
         return request.build_absolute_uri(url)
     return url
@@ -66,10 +105,10 @@ class BookSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'created_at', 'updated_at']
 
     def get_cover_image(self, obj):
-        return _file_url(obj.cover_image, self.context.get('request'))
+        return _file_url(obj.cover_image, self.context.get('request'), resource_type='image')
 
     def get_pdf_file(self, obj):
-        return _file_url(obj.pdf_file, self.context.get('request'))
+        return _file_url(obj.pdf_file, self.context.get('request'), resource_type='raw')
     
     def get_category(self, obj):
         """Return category as string name for frontend compatibility"""
@@ -131,11 +170,11 @@ class BookListSerializer(serializers.ModelSerializer):
         ]
 
     def get_cover_image(self, obj):
-        return _file_url(obj.cover_image, self.context.get('request'))
-    
+        return _file_url(obj.cover_image, self.context.get('request'), resource_type='image')
+
     def get_category_name(self, obj):
         return obj.category.name if obj.category else None
-    
+
     def get_has_pdf(self, obj):
         return bool(obj.pdf_file)
     
