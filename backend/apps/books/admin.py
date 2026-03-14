@@ -54,24 +54,45 @@ class BookAdmin(admin.ModelAdmin):
     )
 
     def save_model(self, request, obj, form, change):
-        """Catch storage errors (e.g. Cloudinary upload failure) so the admin
-        doesn't show a blank 500 page — shows a warning instead."""
+        """Save the book, gracefully handling file-storage errors.
+
+        If the cover image or PDF upload fails (e.g. wrong Cloudinary
+        credentials, storage unreachable), the book text data is still saved
+        to the database without the file, and a clear warning is shown.
+        This prevents a blank 500 page from appearing in the admin.
+        """
         try:
             super().save_model(request, obj, form, change)
         except Exception as exc:
             logger.error(
                 'BookAdmin save_model failed for "%s": %s', obj.title, exc, exc_info=True
             )
-            messages.error(
+            # Clear failing file fields so the second save (text data only) works.
+            if 'cover_image' in form.changed_data:
+                obj.cover_image = None
+            if 'pdf_file' in form.changed_data:
+                obj.pdf_file = None
+
+            # Second attempt — save without the file(s).
+            try:
+                obj.save()
+            except Exception as inner_exc:
+                logger.error(
+                    'BookAdmin fallback save also failed for "%s": %s',
+                    obj.title, inner_exc, exc_info=True,
+                )
+                messages.error(request, f'Could not save book: {inner_exc}')
+                raise inner_exc
+
+            messages.warning(
                 request,
-                f'Failed to save book file (cover/PDF): {exc}  '
-                'If you are using Cloudinary, verify that CLOUDINARY_CLOUD_NAME, '
-                'CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET are correct in Render '
-                'environment variables. To use local storage instead, remove all '
-                'CLOUDINARY_* variables.'
+                f'Book "{obj.title}" was saved WITHOUT the image/PDF because the '
+                f'file storage failed: {exc}. '
+                'To fix this permanently, add CLOUDINARY_CLOUD_NAME, '
+                'CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET to your '
+                'Render environment variables (free account at cloudinary.com). '
+                'Then re-upload the image.'
             )
-            # Re-raise so Django admin does not show a success message
-            raise
 
     def cover_preview(self, obj):
         if obj.cover_image:

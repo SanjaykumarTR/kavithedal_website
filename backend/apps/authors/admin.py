@@ -1,9 +1,12 @@
 """
 Admin configuration for Authors app — with photo preview and Cloudinary support.
 """
-from django.contrib import admin
+import logging
+from django.contrib import admin, messages
 from django.utils.html import mark_safe
 from .models import Author
+
+logger = logging.getLogger('apps')
 
 
 @admin.register(Author)
@@ -28,6 +31,28 @@ class AuthorAdmin(admin.ModelAdmin):
             'classes': ('collapse',),
         }),
     )
+
+    def save_model(self, request, obj, form, change):
+        """Save author, falling back to no photo if storage upload fails."""
+        try:
+            super().save_model(request, obj, form, change)
+        except Exception as exc:
+            logger.error(
+                'AuthorAdmin save_model failed for "%s": %s', obj.name, exc, exc_info=True
+            )
+            if 'photo' in form.changed_data:
+                obj.photo = None
+            try:
+                obj.save()
+            except Exception as inner_exc:
+                messages.error(request, f'Could not save author: {inner_exc}')
+                raise inner_exc
+            messages.warning(
+                request,
+                f'Author "{obj.name}" saved WITHOUT photo because the file storage '
+                f'failed: {exc}. Add CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and '
+                'CLOUDINARY_API_SECRET to Render environment variables to fix this.'
+            )
 
     def photo_preview(self, obj):
         if obj.photo:
