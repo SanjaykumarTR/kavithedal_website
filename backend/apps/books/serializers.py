@@ -26,16 +26,14 @@ class CategorySerializer(serializers.ModelSerializer):
 
 
 def _cloudinary_url(name, resource_type='image'):
-    """Construct a correct Cloudinary delivery URL from the stored field name.
+    """Construct a Cloudinary delivery URL from a stored field name.
 
-    django-cloudinary-storage MediaCloudinaryStorage.RESOURCE_TYPE = 'image',
-    so ALL uploaded files (cover images AND PDFs) are stored under /image/upload/.
-
-    Handles three cases:
-      1. Plain path  e.g. 'books/covers/file.jpeg'
-      2. Already-correct URL  e.g. 'https://res.cloudinary.com/.../image/upload/...'
-      3. Malformed URL missing resource_type/upload segment
-         e.g. 'https://res.cloudinary.com/dyeu9bwrh/books/covers/file.jpeg'
+    NOTE: django-cloudinary-storage prepends MEDIA_URL (= 'media/') as a
+    folder prefix when uploading, so the actual Cloudinary public_id is
+    'media/<name>'.  This function should only be used when you already
+    have the full public_id (including any prefix), or for admin display
+    fallbacks.  For serialiser use, always call field_file.url instead —
+    the storage backend handles the prefix automatically.
     """
     cloud = getattr(settings, 'CLOUDINARY_STORAGE', {}).get('CLOUD_NAME', '')
     if not cloud or not name:
@@ -53,36 +51,29 @@ def _cloudinary_url(name, resource_type='image'):
             return f'https://res.cloudinary.com/{cloud}/{resource_type}/upload/{path}'
         return clean  # unknown URL format — return unchanged
 
-    if clean.startswith('media/'):
-        clean = clean[6:]
     return f'https://res.cloudinary.com/{cloud}/{resource_type}/upload/{clean}'
 
 
 def _file_url(field_file, request=None, resource_type='image'):
-    """Return an absolute URL for any storage-backed file field."""
+    """Return an absolute URL for any storage-backed file field.
+
+    Uses field_file.url which calls MediaCloudinaryStorage._get_url().
+    That method calls _prepend_prefix() to add the MEDIA_URL folder prefix
+    ('media/') so Cloudinary resolves the correct public_id.
+    Do NOT call _cloudinary_url() here — it would miss the prefix.
+    """
     if not field_file:
         return None
 
-    stored_name = None
-    try:
-        stored_name = field_file.name
-    except Exception:
-        pass
+    stored_name = getattr(field_file, 'name', None)
 
-    # Always run stored_name through _cloudinary_url first.
-    # This repairs malformed Cloudinary URLs (missing /image/upload/ segment)
-    # and handles plain paths. Only skip if Cloudinary is not configured.
-    if stored_name:
-        fixed = _cloudinary_url(stored_name, resource_type)
-        if fixed:
-            logger.info('_file_url: stored=%s  fixed=%s', stored_name, fixed)
-            return fixed
-
-    # Fallback: let the storage backend build the URL
     try:
         url = field_file.url
     except Exception as e:
         logger.warning('_file_url: .url raised %s for field %s', e, stored_name)
+        return None
+
+    if not url:
         return None
 
     if url.startswith('http://') or url.startswith('https://'):

@@ -1,37 +1,23 @@
 """
 Serializers for Authors App.
 """
-from django.conf import settings
 from rest_framework import serializers
 from .models import Author
 
 
 def _photo_url(field_file, request=None):
-    """Return an absolute URL for the author photo, repairing malformed Cloudinary URLs."""
-    from apps.books.serializers import _cloudinary_url
+    """Return an absolute URL for the author photo using the storage backend."""
     if not field_file:
         return None
-
-    stored_name = None
-    try:
-        stored_name = field_file.name
-    except Exception:
-        pass
-
-    if stored_name:
-        fixed = _cloudinary_url(stored_name, resource_type='image')
-        if fixed:
-            return fixed
-
     try:
         url = field_file.url
     except Exception:
-        url = None
-
-    if url and (url.startswith('http://') or url.startswith('https://')):
+        return None
+    if not url:
+        return None
+    if url.startswith('http://') or url.startswith('https://'):
         return url
-
-    if url and request is not None:
+    if request is not None:
         return request.build_absolute_uri(url)
     return url
 

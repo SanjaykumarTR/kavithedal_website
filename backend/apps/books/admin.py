@@ -134,17 +134,14 @@ class BookAdmin(admin.ModelAdmin):
                 messages.success(request, '✅ PDF file cleared successfully.')
             if image_uploading and obj.cover_image:
                 try:
-                    from apps.books.serializers import _cloudinary_url
-                    stored = obj.cover_image.name if obj.cover_image else None
-                    url = _cloudinary_url(stored, 'image') if stored else None
-                    if url:
-                        messages.success(request, mark_safe(
-                            f'✅ Cover image uploaded successfully. '
-                            f'<a href="{url}" target="_blank">View on Cloudinary ↗</a>'
-                            if _cloudinary_active() else '✅ Cover image saved.'
-                        ))
+                    url = obj.cover_image.url
+                    messages.success(request, mark_safe(
+                        f'✅ Cover image uploaded successfully. '
+                        f'<a href="{url}" target="_blank">View on Cloudinary ↗</a>'
+                        if _cloudinary_active() else '✅ Cover image saved.'
+                    ))
                 except Exception:
-                    pass
+                    messages.success(request, '✅ Cover image saved.')
             if pdf_uploading and obj.pdf_file:
                 messages.success(request, '✅ PDF uploaded successfully.')
 
@@ -175,11 +172,7 @@ class BookAdmin(admin.ModelAdmin):
     def cover_preview(self, obj):
         if obj.cover_image:
             try:
-                from apps.books.serializers import _cloudinary_url
-                stored = obj.cover_image.name if obj.cover_image else None
-                url = _cloudinary_url(stored, 'image') if stored else None
-                if not url:
-                    url = obj.cover_image.url
+                url = obj.cover_image.url
             except Exception:
                 return '(no preview)'
             return mark_safe(

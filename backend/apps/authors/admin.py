@@ -84,11 +84,7 @@ class AuthorAdmin(admin.ModelAdmin):
     def photo_preview(self, obj):
         if obj.photo:
             try:
-                from apps.books.serializers import _cloudinary_url
-                stored = obj.photo.name if obj.photo else None
-                url = _cloudinary_url(stored, 'image') if stored else None
-                if not url:
-                    url = obj.photo.url
+                url = obj.photo.url
             except Exception:
                 return '(no preview)'
             return mark_safe(
