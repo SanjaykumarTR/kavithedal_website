@@ -2,11 +2,17 @@
 Admin configuration for Books app — with image previews and Cloudinary support.
 """
 import logging
+from django.conf import settings
 from django.contrib import admin, messages
 from django.utils.html import mark_safe
 from .models import Book, Category, BookSubmission, ContactMessage
 
 logger = logging.getLogger('apps')
+
+
+def _cloudinary_active():
+    """Return True when Cloudinary is the active file storage backend."""
+    return getattr(settings, 'DEFAULT_FILE_STORAGE', '').startswith('cloudinary')
 
 
 @admin.register(Book)
@@ -53,6 +59,25 @@ class BookAdmin(admin.ModelAdmin):
         }),
     )
 
+    def changelist_view(self, request, extra_context=None):
+        """Show a Cloudinary status banner at the top of the book list."""
+        if _cloudinary_active():
+            cloud = getattr(settings, 'CLOUDINARY_STORAGE', {}).get('CLOUD_NAME', '?')
+            messages.info(
+                request,
+                f'✅ Cloudinary is active (cloud: {cloud}). '
+                'Uploaded images and PDFs are stored permanently on Cloudinary CDN.'
+            )
+        else:
+            messages.warning(
+                request,
+                '⚠️ Cloudinary is NOT configured. '
+                'Uploaded images will be lost on every Render redeploy. '
+                'Set CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET '
+                'in your Render environment variables.'
+            )
+        return super().changelist_view(request, extra_context=extra_context)
+
     def save_model(self, request, obj, form, change):
         """Save the book, gracefully handling file-storage errors.
 
@@ -61,8 +86,25 @@ class BookAdmin(admin.ModelAdmin):
         to the database without the file, and a clear warning is shown.
         This prevents a blank 500 page from appearing in the admin.
         """
+        image_changed = 'cover_image' in form.changed_data and form.cleaned_data.get('cover_image')
+        pdf_changed = 'pdf_file' in form.changed_data and form.cleaned_data.get('pdf_file')
+
         try:
             super().save_model(request, obj, form, change)
+            # Confirm successful uploads so the admin knows they worked.
+            if image_changed and obj.cover_image:
+                try:
+                    url = obj.cover_image.url
+                    messages.success(request, mark_safe(
+                        f'✅ Cover image uploaded successfully. '
+                        f'<a href="{url}" target="_blank">View on Cloudinary ↗</a>'
+                        if _cloudinary_active() else
+                        f'Cover image saved.'
+                    ))
+                except Exception:
+                    pass
+            if pdf_changed and obj.pdf_file:
+                messages.success(request, '✅ PDF uploaded successfully.')
         except Exception as exc:
             logger.error(
                 'BookAdmin save_model failed for "%s": %s', obj.title, exc, exc_info=True
@@ -86,12 +128,10 @@ class BookAdmin(admin.ModelAdmin):
 
             messages.warning(
                 request,
-                f'Book "{obj.title}" was saved WITHOUT the image/PDF because the '
-                f'file storage failed: {exc}. '
-                'To fix this permanently, add CLOUDINARY_CLOUD_NAME, '
-                'CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET to your '
-                'Render environment variables (free account at cloudinary.com). '
-                'Then re-upload the image.'
+                f'❌ Book saved WITHOUT image/PDF — file upload failed: {exc}. '
+                'Check that CLOUDINARY_CLOUD_NAME=dyeu9bwrh, CLOUDINARY_API_KEY, '
+                'and CLOUDINARY_API_SECRET are correct in Render environment variables. '
+                'Then re-edit this book and upload the image again.'
             )
 
     def cover_preview(self, obj):
