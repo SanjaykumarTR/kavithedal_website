@@ -237,7 +237,7 @@ def image_diagnostic(request):
             raw_url = book.cover_image.url if book.cover_image else None
         except Exception as e:
             raw_url = f'ERROR: {e}'
-        resolved = _file_url(book.cover_image, request, resource_type='image')
+        resolved = _file_url(book.cover_image, request, resource_type='raw')
         results.append({
             'title': book.title,
             'stored_name': stored,
