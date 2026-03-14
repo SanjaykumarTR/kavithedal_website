@@ -343,7 +343,7 @@ if _cloudinary_configured:
         'API_SECRET': os.environ.get('CLOUDINARY_API_SECRET'),
     }
     DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
-    # Keep MEDIA_URL pointing to Cloudinary CDN root (library uses this as base)
-    MEDIA_URL = 'https://res.cloudinary.com/{}/'.format(
-        os.environ.get('CLOUDINARY_CLOUD_NAME')
-    )
+    # NOTE: Do NOT set MEDIA_URL to the Cloudinary CDN root here.
+    # django-cloudinary-storage 0.3.x builds file URLs as MEDIA_URL + filename,
+    # which produces malformed Cloudinary URLs (missing /image/upload/ segment).
+    # Correct Cloudinary URLs are built in serializers via _cloudinary_url().

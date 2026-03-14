@@ -25,11 +25,6 @@ export default function Books() {
       try {
         const response = await api.get("/api/books/");
         const booksData = response.data.results || response.data;
-        // DEBUG — remove after confirming images show correctly
-        if (booksData.length > 0) {
-          console.log('[Books] First book cover_image from API:', booksData[0]?.cover_image);
-          console.log('[Books] All cover_images:', booksData.map(b => ({ title: b.title, cover_image: b.cover_image })));
-        }
         setBooks(booksData);
       } catch (err) {
         console.error("Error fetching books:", err);

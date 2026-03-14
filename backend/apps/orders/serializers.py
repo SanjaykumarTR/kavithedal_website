@@ -3,7 +3,7 @@ Serializers for Orders App.
 """
 from rest_framework import serializers
 from .models import Order, Payment, UserLibrary, EbookPurchase, DeliveryZone
-from apps.books.serializers import BookSerializer
+from apps.books.serializers import BookSerializer, _file_url
 
 
 class DeliveryZoneSerializer(serializers.ModelSerializer):
@@ -28,8 +28,11 @@ class DeliveryZoneLookupSerializer(serializers.Serializer):
 class OrderSerializer(serializers.ModelSerializer):
     """Serializer for Order model."""
     book_title = serializers.CharField(source='book.title', read_only=True)
-    book_cover = serializers.ImageField(source='book.cover_image', read_only=True)
+    book_cover = serializers.SerializerMethodField()
     user_email = serializers.CharField(source='user.email', read_only=True)
+
+    def get_book_cover(self, obj):
+        return _file_url(obj.book.cover_image, self.context.get('request'), resource_type='image')
     delivery_zone_info = DeliveryZoneSerializer(source='delivery_zone', read_only=True)
     
     class Meta:
@@ -158,9 +161,12 @@ class UserLibraryListSerializer(serializers.ModelSerializer):
     """Serializer for listing user's library."""
     book_id = serializers.UUIDField(source='book.id', read_only=True)
     book_title = serializers.CharField(source='book.title', read_only=True)
-    book_cover = serializers.ImageField(source='book.cover_image', read_only=True)
+    book_cover = serializers.SerializerMethodField()
     book_author = serializers.CharField(source='book.author.name', read_only=True)
     has_pdf = serializers.BooleanField(source='book.pdf_file', read_only=True)
+
+    def get_book_cover(self, obj):
+        return _file_url(obj.book.cover_image, self.context.get('request'), resource_type='image')
     
     class Meta:
         model = UserLibrary
@@ -173,8 +179,11 @@ class UserLibraryListSerializer(serializers.ModelSerializer):
 class EbookPurchaseSerializer(serializers.ModelSerializer):
     """Serializer for EbookPurchase model."""
     book_title = serializers.CharField(source='book.title', read_only=True)
-    book_cover = serializers.ImageField(source='book.cover_image', read_only=True)
+    book_cover = serializers.SerializerMethodField()
     user_email = serializers.CharField(source='user.email', read_only=True)
+
+    def get_book_cover(self, obj):
+        return _file_url(obj.book.cover_image, self.context.get('request'), resource_type='image')
     
     class Meta:
         model = EbookPurchase
