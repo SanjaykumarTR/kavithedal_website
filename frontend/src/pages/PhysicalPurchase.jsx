@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from "react-router-dom";
 import { LanguageContext } from "../context/LanguageContext";
 import { useAuth } from "../context/AuthContext";
 import api from "../api/axios";
+import { mediaUrl } from "../utils/mediaUrl";
 import "../styles/bookDetail.css";
 
 export default function PhysicalPurchase() {
@@ -221,7 +222,7 @@ export default function PhysicalPurchase() {
           <h1>{t.title}</h1>
           
           <div className="book-summary">
-            <img src={book.cover_image} alt={book.title} />
+            <img src={mediaUrl(book.cover_image)} alt={book.title} />
             <div className="book-info">
               <h3>{book.title}</h3>
               <p>{book.author_name || book.author?.name}</p>

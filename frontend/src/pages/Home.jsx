@@ -5,6 +5,7 @@ import PromoSection from "../components/PromoSection";
 import ImageSlider from "../components/ImageSlider";
 import ProductCard from "../components/ProductCard";
 import api from "../api/axios";
+import { mediaUrl } from "../utils/mediaUrl";
 import "../styles/home.css";
 
 
@@ -48,7 +49,7 @@ export default function Home() {
       oldPrice: originalPrice,
       discount: discountPercent,
       rating: 4.5,
-      image: book.cover_image || "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=200&h=300&fit=crop",
+      image: mediaUrl(book.cover_image),
       category: book.category_name || "Uncategorized",
       ebook_price: ebookPrice,
       physical_price: physicalPrice,

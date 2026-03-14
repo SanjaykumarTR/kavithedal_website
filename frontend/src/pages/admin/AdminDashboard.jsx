@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import AdminLayout from "../../components/admin/AdminLayout";
 import api from "../../api/axios";
 import { useTranslation } from "../../context/LanguageContext";
+import { mediaUrl } from "../../utils/mediaUrl";
 import "../../styles/admin.css";
 
 export default function AdminDashboard() {
@@ -118,7 +119,7 @@ export default function AdminDashboard() {
               <div key={book.id} className="admin-recent-item">
                 {book.cover_image && (
                   <img
-                    src={book.cover_image}
+                    src={mediaUrl(book.cover_image)}
                     alt={book.title}
                     className="admin-table-img"
                   />

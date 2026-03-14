@@ -5,6 +5,8 @@ import ProductCard from "../components/ProductCard";
 import api from "../api/axios";
 import "../styles/books.css";
 
+const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000";
+
 export default function Books() {
   const { language } = useContext(LanguageContext);
   const [searchParams] = useSearchParams();
@@ -58,7 +60,7 @@ export default function Books() {
       discount: discountPercent,
       rating: 4.5,
       image: book.cover_image
-        ? (book.cover_image.startsWith("http") ? book.cover_image : `${import.meta.env.VITE_API_URL || ""}${book.cover_image}`)
+        ? (book.cover_image.startsWith("http") ? book.cover_image : `${API_BASE}${book.cover_image}`)
         : "https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=200&h=300&fit=crop",
       category: book.category_name || "Uncategorized",
       ebook_price: ebookPrice,

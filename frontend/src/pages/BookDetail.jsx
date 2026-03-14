@@ -5,6 +5,7 @@ import { useAuth } from "../context/AuthContext";
 import { CartContext } from "../context/CartContext";
 import api from "../api/axios";
 import { createOrder, checkBookAccess } from "../api/orders";
+import { mediaUrl } from "../utils/mediaUrl";
 import "../styles/bookDetail.css";
 
 export default function BookDetail() {
@@ -213,9 +214,9 @@ export default function BookDetail() {
           {hasDiscount && (
             <span className="book-discount-badge">-{book.discount_percentage}% OFF</span>
           )}
-          <img 
-            src={book.cover_image} 
-            alt={book.title} 
+          <img
+            src={mediaUrl(book.cover_image)}
+            alt={book.title}
             className="book-detail-cover"
           />
         </div>

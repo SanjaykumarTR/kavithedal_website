@@ -222,7 +222,7 @@ export default function AdminBooks() {
                     <tr key={b.id}>
                       <td>
                         {b.cover_image ? (
-                          <img src={b.cover_image} alt={b.title} className="admin-table-img" />
+                          <img src={b.cover_image.startsWith("http") ? b.cover_image : `${API_BASE}${b.cover_image}`} alt={b.title} className="admin-table-img" />
                         ) : (
                           <div style={{ width: 48, height: 48, background: "#f0f2f5", borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}>📚</div>
                         )}
@@ -422,7 +422,7 @@ export default function AdminBooks() {
                     <label className="admin-form-label">{t("books", "coverImageLabel")}</label>
                     <input className="admin-form-input" type="file" name="cover_image" accept="image/*" onChange={handleChange} />
                     {selected?.cover_image && !form.cover_image && (
-                      <img src={selected.cover_image} alt="" className="admin-img-preview" style={{ marginTop: 8 }} />
+                      <img src={selected.cover_image.startsWith("http") ? selected.cover_image : `${API_BASE}${selected.cover_image}`} alt="" className="admin-img-preview" style={{ marginTop: 8 }} />
                     )}
                   </div>
                   <div className="admin-form-group full">
