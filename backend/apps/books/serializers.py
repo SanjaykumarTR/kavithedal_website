@@ -26,21 +26,37 @@ class CategorySerializer(serializers.ModelSerializer):
 
 
 def _cloudinary_url(name, resource_type='image'):
-    """Construct a Cloudinary URL directly from the stored field name."""
+    """Construct a correct Cloudinary delivery URL from the stored field name.
+
+    Handles three cases:
+      1. Plain path  e.g. 'books/covers/file.jpeg'
+      2. Already-correct URL  e.g. 'https://res.cloudinary.com/.../image/upload/...'
+      3. Malformed URL missing resource_type/upload segment
+         e.g. 'https://res.cloudinary.com/dyeu9bwrh/books/covers/file.jpeg'
+    """
     cloud = getattr(settings, 'CLOUDINARY_STORAGE', {}).get('CLOUD_NAME', '')
     if not cloud or not name:
         return None
     clean = str(name).lstrip('/')
+
     if clean.startswith('http://') or clean.startswith('https://'):
-        return clean  # already absolute
+        # Already a proper Cloudinary delivery URL — leave it alone
+        if '/image/upload/' in clean or '/raw/upload/' in clean or '/video/upload/' in clean:
+            return clean
+        # Malformed: has cloud domain but missing the resource_type/upload segment
+        prefix = f'res.cloudinary.com/{cloud}/'
+        if prefix in clean:
+            path = clean.split(prefix, 1)[1]
+            return f'https://res.cloudinary.com/{cloud}/{resource_type}/upload/{path}'
+        return clean  # unknown URL format — return unchanged
+
     if clean.startswith('media/'):
         clean = clean[6:]
     return f'https://res.cloudinary.com/{cloud}/{resource_type}/upload/{clean}'
 
 
 def _file_url(field_file, request=None, resource_type='image'):
-    """Return an absolute URL for any storage-backed file field.
-    Works for both Cloudinary (already-absolute URLs) and local /media/ paths."""
+    """Return an absolute URL for any storage-backed file field."""
     if not field_file:
         return None
 
@@ -50,26 +66,24 @@ def _file_url(field_file, request=None, resource_type='image'):
     except Exception:
         pass
 
-    # If the stored value itself is already an absolute URL
-    if stored_name and isinstance(stored_name, str):
-        if stored_name.startswith('http://') or stored_name.startswith('https://'):
-            return stored_name
+    # Always run stored_name through _cloudinary_url first.
+    # This repairs malformed Cloudinary URLs (missing /image/upload/ segment)
+    # and handles plain paths. Only skip if Cloudinary is not configured.
+    if stored_name:
+        fixed = _cloudinary_url(stored_name, resource_type)
+        if fixed:
+            logger.info('_file_url: stored=%s  fixed=%s', stored_name, fixed)
+            return fixed
 
+    # Fallback: let the storage backend build the URL
     try:
-        url = field_file.url          # uses the configured storage backend
+        url = field_file.url
     except Exception as e:
-        logger.warning('_file_url: .url raised %s for field %s; trying Cloudinary fallback', e, stored_name)
-        return _cloudinary_url(stored_name, resource_type)
+        logger.warning('_file_url: .url raised %s for field %s', e, stored_name)
+        return None
 
-    logger.info('_file_url: stored=%s  url=%s', stored_name, url)
-
-    if url.startswith("http://") or url.startswith("https://"):
-        return url                    # Cloudinary / any absolute URL — return as-is
-
-    # Relative URL from local storage — try Cloudinary fallback first
-    fallback = _cloudinary_url(stored_name, resource_type)
-    if fallback:
-        return fallback
+    if url.startswith('http://') or url.startswith('https://'):
+        return url
 
     if request is not None:
         return request.build_absolute_uri(url)

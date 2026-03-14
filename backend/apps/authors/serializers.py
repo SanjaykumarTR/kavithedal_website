@@ -7,35 +7,29 @@ from .models import Author
 
 
 def _photo_url(field_file, request=None):
-    """Return an absolute URL for the author photo regardless of storage backend."""
+    """Return an absolute URL for the author photo, repairing malformed Cloudinary URLs."""
+    from apps.books.serializers import _cloudinary_url
     if not field_file:
         return None
 
-    # If the stored name is already an absolute URL
+    stored_name = None
     try:
         stored_name = field_file.name
-        if stored_name and isinstance(stored_name, str):
-            if stored_name.startswith('http://') or stored_name.startswith('https://'):
-                return stored_name
     except Exception:
-        stored_name = None
+        pass
+
+    if stored_name:
+        fixed = _cloudinary_url(stored_name, resource_type='image')
+        if fixed:
+            return fixed
 
     try:
         url = field_file.url
     except Exception:
         url = None
 
-    if url and (url.startswith("http://") or url.startswith("https://")):
+    if url and (url.startswith('http://') or url.startswith('https://')):
         return url
-
-    # Cloudinary fallback
-    cloud = getattr(settings, 'CLOUDINARY_STORAGE', {}).get('CLOUD_NAME', '')
-    if cloud and stored_name:
-        clean = str(stored_name).lstrip('/')
-        if clean.startswith('media/'):
-            clean = clean[6:]
-        if not clean.startswith('http'):
-            return f'https://res.cloudinary.com/{cloud}/image/upload/{clean}'
 
     if url and request is not None:
         return request.build_absolute_uri(url)
