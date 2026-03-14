@@ -34,13 +34,23 @@ class AuthorAdmin(admin.ModelAdmin):
 
     def save_model(self, request, obj, form, change):
         """Save author, falling back to no photo if storage upload fails."""
+        photo_clearing = 'photo' in form.changed_data and form.cleaned_data.get('photo') is False
+
+        # Clearing a Cloudinary-backed field calls storage.delete() which can raise.
+        # Bypass it with a direct DB update.
+        if photo_clearing:
+            obj.photo = None
+            obj.__class__.objects.filter(pk=obj.pk).update(photo='')
+
         try:
             super().save_model(request, obj, form, change)
+            if photo_clearing:
+                messages.success(request, '✅ Author photo cleared successfully.')
         except Exception as exc:
             logger.error(
                 'AuthorAdmin save_model failed for "%s": %s', obj.name, exc, exc_info=True
             )
-            if 'photo' in form.changed_data:
+            if 'photo' in form.changed_data and not photo_clearing:
                 obj.photo = None
             try:
                 obj.save()

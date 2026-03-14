@@ -79,43 +79,49 @@ class BookAdmin(admin.ModelAdmin):
         return super().changelist_view(request, extra_context=extra_context)
 
     def save_model(self, request, obj, form, change):
-        """Save the book, gracefully handling file-storage errors.
+        """Save the book, gracefully handling file-storage errors."""
+        image_changed = 'cover_image' in form.changed_data
+        pdf_changed = 'pdf_file' in form.changed_data
+        image_clearing = image_changed and form.cleaned_data.get('cover_image') is False
+        pdf_clearing = pdf_changed and form.cleaned_data.get('pdf_file') is False
+        image_uploading = image_changed and bool(form.cleaned_data.get('cover_image'))
+        pdf_uploading = pdf_changed and bool(form.cleaned_data.get('pdf_file'))
 
-        If the cover image or PDF upload fails (e.g. wrong Cloudinary
-        credentials, storage unreachable), the book text data is still saved
-        to the database without the file, and a clear warning is shown.
-        This prevents a blank 500 page from appearing in the admin.
-        """
-        image_changed = 'cover_image' in form.changed_data and form.cleaned_data.get('cover_image')
-        pdf_changed = 'pdf_file' in form.changed_data and form.cleaned_data.get('pdf_file')
+        # When clearing files, Cloudinary storage.delete() can raise exceptions.
+        # Use a direct DB update to clear the field safely, then save the rest.
+        if image_clearing:
+            obj.cover_image = None
+            obj.__class__.objects.filter(pk=obj.pk).update(cover_image='')
+        if pdf_clearing:
+            obj.pdf_file = None
+            obj.__class__.objects.filter(pk=obj.pk).update(pdf_file='')
 
         try:
             super().save_model(request, obj, form, change)
-            # Confirm successful uploads so the admin knows they worked.
-            if image_changed and obj.cover_image:
+            if image_clearing:
+                messages.success(request, '✅ Cover image cleared successfully.')
+            if pdf_clearing:
+                messages.success(request, '✅ PDF file cleared successfully.')
+            if image_uploading and obj.cover_image:
                 try:
                     url = obj.cover_image.url
                     messages.success(request, mark_safe(
                         f'✅ Cover image uploaded successfully. '
                         f'<a href="{url}" target="_blank">View on Cloudinary ↗</a>'
-                        if _cloudinary_active() else
-                        f'Cover image saved.'
+                        if _cloudinary_active() else 'Cover image saved.'
                     ))
                 except Exception:
                     pass
-            if pdf_changed and obj.pdf_file:
+            if pdf_uploading and obj.pdf_file:
                 messages.success(request, '✅ PDF uploaded successfully.')
         except Exception as exc:
             logger.error(
                 'BookAdmin save_model failed for "%s": %s', obj.title, exc, exc_info=True
             )
-            # Clear failing file fields so the second save (text data only) works.
-            if 'cover_image' in form.changed_data:
+            if image_uploading:
                 obj.cover_image = None
-            if 'pdf_file' in form.changed_data:
+            if pdf_uploading:
                 obj.pdf_file = None
-
-            # Second attempt — save without the file(s).
             try:
                 obj.save()
             except Exception as inner_exc:
@@ -125,13 +131,11 @@ class BookAdmin(admin.ModelAdmin):
                 )
                 messages.error(request, f'Could not save book: {inner_exc}')
                 raise inner_exc
-
             messages.warning(
                 request,
                 f'❌ Book saved WITHOUT image/PDF — file upload failed: {exc}. '
-                'Check that CLOUDINARY_CLOUD_NAME=dyeu9bwrh, CLOUDINARY_API_KEY, '
-                'and CLOUDINARY_API_SECRET are correct in Render environment variables. '
-                'Then re-edit this book and upload the image again.'
+                'Check that CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, '
+                'and CLOUDINARY_API_SECRET are correct in Render environment variables.'
             )
 
     def cover_preview(self, obj):
