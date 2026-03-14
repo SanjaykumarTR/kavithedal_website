@@ -136,7 +136,7 @@ class BookAdmin(admin.ModelAdmin):
                 try:
                     from apps.books.serializers import _cloudinary_url
                     stored = obj.cover_image.name if obj.cover_image else None
-                    url = _cloudinary_url(stored, 'raw') if stored else None
+                    url = _cloudinary_url(stored, 'image') if stored else None
                     if url:
                         messages.success(request, mark_safe(
                             f'✅ Cover image uploaded successfully. '
@@ -177,7 +177,7 @@ class BookAdmin(admin.ModelAdmin):
             try:
                 from apps.books.serializers import _cloudinary_url
                 stored = obj.cover_image.name if obj.cover_image else None
-                url = _cloudinary_url(stored, 'raw') if stored else None
+                url = _cloudinary_url(stored, 'image') if stored else None
                 if not url:
                     url = obj.cover_image.url
             except Exception:

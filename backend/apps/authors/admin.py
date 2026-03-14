@@ -86,7 +86,7 @@ class AuthorAdmin(admin.ModelAdmin):
             try:
                 from apps.books.serializers import _cloudinary_url
                 stored = obj.photo.name if obj.photo else None
-                url = _cloudinary_url(stored, 'raw') if stored else None
+                url = _cloudinary_url(stored, 'image') if stored else None
                 if not url:
                     url = obj.photo.url
             except Exception:

@@ -32,7 +32,7 @@ class OrderSerializer(serializers.ModelSerializer):
     user_email = serializers.CharField(source='user.email', read_only=True)
 
     def get_book_cover(self, obj):
-        return _file_url(obj.book.cover_image, self.context.get('request'), resource_type='raw')
+        return _file_url(obj.book.cover_image, self.context.get('request'), resource_type='image')
     delivery_zone_info = DeliveryZoneSerializer(source='delivery_zone', read_only=True)
     
     class Meta:
@@ -166,7 +166,7 @@ class UserLibraryListSerializer(serializers.ModelSerializer):
     has_pdf = serializers.BooleanField(source='book.pdf_file', read_only=True)
 
     def get_book_cover(self, obj):
-        return _file_url(obj.book.cover_image, self.context.get('request'), resource_type='raw')
+        return _file_url(obj.book.cover_image, self.context.get('request'), resource_type='image')
     
     class Meta:
         model = UserLibrary
@@ -183,7 +183,7 @@ class EbookPurchaseSerializer(serializers.ModelSerializer):
     user_email = serializers.CharField(source='user.email', read_only=True)
 
     def get_book_cover(self, obj):
-        return _file_url(obj.book.cover_image, self.context.get('request'), resource_type='raw')
+        return _file_url(obj.book.cover_image, self.context.get('request'), resource_type='image')
     
     class Meta:
         model = EbookPurchase

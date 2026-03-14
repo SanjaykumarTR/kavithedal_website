@@ -25,15 +25,15 @@ class CategorySerializer(serializers.ModelSerializer):
         return obj.books.count()
 
 
-def _cloudinary_url(name, resource_type='raw'):
+def _cloudinary_url(name, resource_type='image'):
     """Construct a correct Cloudinary delivery URL from the stored field name.
 
-    django-cloudinary-storage MediaCloudinaryStorage uses RESOURCE_TYPE='raw'
-    by default, so all uploaded files (images AND PDFs) live under /raw/upload/.
+    django-cloudinary-storage MediaCloudinaryStorage.RESOURCE_TYPE = 'image',
+    so ALL uploaded files (cover images AND PDFs) are stored under /image/upload/.
 
     Handles three cases:
       1. Plain path  e.g. 'books/covers/file.jpeg'
-      2. Already-correct URL  e.g. 'https://res.cloudinary.com/.../raw/upload/...'
+      2. Already-correct URL  e.g. 'https://res.cloudinary.com/.../image/upload/...'
       3. Malformed URL missing resource_type/upload segment
          e.g. 'https://res.cloudinary.com/dyeu9bwrh/books/covers/file.jpeg'
     """
@@ -43,14 +43,8 @@ def _cloudinary_url(name, resource_type='raw'):
     clean = str(name).lstrip('/')
 
     if clean.startswith('http://') or clean.startswith('https://'):
-        # Already a proper Cloudinary URL with /raw/upload/ — perfect
-        if '/raw/upload/' in clean:
-            return clean
-        # Has /image/upload/ — files were stored as raw, rewrite to /raw/upload/
-        if '/image/upload/' in clean:
-            return clean.replace('/image/upload/', '/raw/upload/', 1)
-        # Video — leave alone
-        if '/video/upload/' in clean:
+        # Already has a delivery type segment — return unchanged
+        if '/image/upload/' in clean or '/raw/upload/' in clean or '/video/upload/' in clean:
             return clean
         # Malformed: has cloud domain but missing resource_type/upload entirely
         prefix = f'res.cloudinary.com/{cloud}/'
@@ -64,7 +58,7 @@ def _cloudinary_url(name, resource_type='raw'):
     return f'https://res.cloudinary.com/{cloud}/{resource_type}/upload/{clean}'
 
 
-def _file_url(field_file, request=None, resource_type='raw'):
+def _file_url(field_file, request=None, resource_type='image'):
     """Return an absolute URL for any storage-backed file field."""
     if not field_file:
         return None
@@ -128,10 +122,10 @@ class BookSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'created_at', 'updated_at']
 
     def get_cover_image(self, obj):
-        return _file_url(obj.cover_image, self.context.get('request'), resource_type='raw')
+        return _file_url(obj.cover_image, self.context.get('request'), resource_type='image')
 
     def get_pdf_file(self, obj):
-        return _file_url(obj.pdf_file, self.context.get('request'), resource_type='raw')
+        return _file_url(obj.pdf_file, self.context.get('request'), resource_type='image')
     
     def get_category(self, obj):
         """Return category as string name for frontend compatibility"""
@@ -193,7 +187,7 @@ class BookListSerializer(serializers.ModelSerializer):
         ]
 
     def get_cover_image(self, obj):
-        return _file_url(obj.cover_image, self.context.get('request'), resource_type='raw')
+        return _file_url(obj.cover_image, self.context.get('request'), resource_type='image')
 
     def get_category_name(self, obj):
         return obj.category.name if obj.category else None

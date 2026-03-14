@@ -112,14 +112,12 @@ export default function ProductCard({ book, showBothPrices = false }) {
           onError={(e) => {
             const target = e.target;
             const src = target.src;
-            // Try switching Cloudinary resource type before falling back to placeholder
+            // All files use /image/upload/ (MediaCloudinaryStorage.RESOURCE_TYPE='image')
+            // Fall back to /raw/upload/ in case of old stored data, then use placeholder
             if (src && src.includes('res.cloudinary.com') && !target.dataset.retried) {
               target.dataset.retried = 'true';
               if (src.includes('/raw/upload/')) {
                 target.src = src.replace('/raw/upload/', '/image/upload/');
-                return;
-              } else if (src.includes('/image/upload/')) {
-                target.src = src.replace('/image/upload/', '/raw/upload/');
                 return;
               }
             }

@@ -19,7 +19,7 @@ def _photo_url(field_file, request=None):
         pass
 
     if stored_name:
-        fixed = _cloudinary_url(stored_name, resource_type='raw')
+        fixed = _cloudinary_url(stored_name, resource_type='image')
         if fixed:
             return fixed
 
