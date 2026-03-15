@@ -1,10 +1,11 @@
 import { useState, useContext } from "react";
 import { useNavigate } from "react-router-dom";
 import { LanguageContext } from "../context/LanguageContext";
-import api from "../api/axios";
+import { useAuth } from "../context/AuthContext";
 
 export default function Login() {
   const { language } = useContext(LanguageContext);
+  const { login, register } = useAuth();
   const navigate = useNavigate();
 
   const [isRegister, setIsRegister] = useState(false);
@@ -28,81 +29,33 @@ export default function Login() {
       setError(language === "en" ? "Please enter your name." : "உங்கள் பெயரை உள்ளிடவும்.");
       return;
     }
+
     setLoading(true);
     try {
-      let res;
       if (isRegister) {
-        // Registration
-        const registerData = {
-          username: form.name || form.email.split('@')[0],
-          email: form.email,
-          password: form.password,
-          confirm_password: form.password
-        };
-        res = await api.post("/api/register/", registerData);
-        
-        const data = res.data;
-        
-        if (data.status === "REGISTRATION_SUCCESS") {
-          localStorage.setItem("access_token", data.access_token);
-          localStorage.setItem("refresh_token", data.refresh_token);
-          localStorage.setItem("auth_user", JSON.stringify({ email: data.user.email, role: data.user.role }));
-          navigate(data.redirect || "/user-dashboard");
-          return;
-        } else {
-          // Handle other statuses
-          setError(data.message || (language === "en" ? "Registration failed" : "பதிவு தோல்வியடைந்தது"));
-          return;
-        }
+        const username = form.name || form.email.split("@")[0];
+        const { redirect } = await register(username, form.email, form.password);
+        navigate(redirect || "/");
       } else {
-        // Login
-        res = await api.post("/api/login/", {
-          email: form.email,
-          password: form.password,
-        });
-        
-        const data = res.data;
-
-        // Handle any status - redirect based on role
-        if (data.access_token) {
-          localStorage.setItem("access_token", data.access_token);
-          localStorage.setItem("refresh_token", data.refresh_token || data.access_token);
-          localStorage.setItem("auth_user", JSON.stringify({ email: form.email, role: data.role || 'user' }));
-          
-          // Redirect based on role
-          if (data.role === 'superadmin' || data.role === 'admin') {
+        try {
+          const userData = await login(form.email, form.password);
+          // Redirect admins to dashboard, regular users to homepage
+          if (userData.role === "admin" || userData.role === "superadmin") {
             navigate("/admin/dashboard");
           } else {
-            navigate("/user-dashboard");
+            navigate("/");
           }
-          return;
-        }
-        
-        // Handle USER_LOGIN_SUCCESS
-        if (data.status === "USER_LOGIN_SUCCESS") {
-          localStorage.setItem("access_token", data.access_token);
-          localStorage.setItem("refresh_token", data.refresh_token);
-          localStorage.setItem("auth_user", JSON.stringify({ email: form.email, role: data.role }));
-          localStorage.setItem("admin_user", JSON.stringify({ email: form.email, role: data.role }));
-          navigate(data.redirect || "/user-dashboard");
-          return;
-        }
-        
-        // Handle ADMIN_OTP_REQUIRED — redirect to OTP verification page
-        if (data.status === "ADMIN_OTP_REQUIRED") {
-          localStorage.setItem("pending_admin_id", data.admin_id);
-          localStorage.setItem("pending_admin_email", form.email);
-          navigate(data.redirect || "/verify-otp");
-          return;
+        } catch (err) {
+          if (err.message === "OTP_REQUIRED") {
+            navigate("/verify-otp");
+          } else {
+            throw err;
+          }
         }
       }
-      
     } catch (err) {
-      console.error('Login/Register error:', err);
-      console.error('Error response:', err.response?.data);
       let msg;
       if (!err.response) {
-        // Network error or CORS — server unreachable
         msg = language === "en"
           ? "Cannot connect to server. Please try again."
           : "சேவையகத்துடன் இணைக்க முடியவில்லை. மீண்டும் முயற்சிக்கவும்.";
@@ -142,7 +95,7 @@ export default function Login() {
 
       <div className="login-card">
         <div className="login-card-glow"></div>
-        
+
         <h2 className="login-title">
           {isRegister
             ? language === "en" ? "Create Account" : "கணக்கை உருவாக்கு"
@@ -186,7 +139,7 @@ export default function Login() {
               className="modern-input"
             />
           </div>
-          
+
           <button type="submit" disabled={loading} className="modern-btn">
             {loading
               ? (language === "en" ? "Please wait..." : "காத்திருக்கவும்...")
@@ -200,14 +153,14 @@ export default function Login() {
           {isRegister ? (
             <>
               {language === "en" ? "Already have an account? " : "ஏற்கனவே கணக்கு உள்ளதா? "}
-              <span className="toggle-link login-link" onClick={() => setIsRegister(!isRegister)}>
+              <span className="toggle-link login-link" onClick={() => setIsRegister(false)}>
                 {language === "en" ? "Login" : "உள்நுழை"}
               </span>
             </>
           ) : (
             <>
               {language === "en" ? "Don't have an account? " : "கணக்கு இல்லையா? "}
-              <span className="toggle-link register-link" onClick={() => setIsRegister(!isRegister)}>
+              <span className="toggle-link register-link" onClick={() => setIsRegister(true)}>
                 {language === "en" ? "Register" : "பதிவு செய்"}
               </span>
             </>

@@ -22,20 +22,48 @@ export function AuthProvider({ children }) {
 
   const login = async (email, password) => {
     const response = await api.post("/api/login/", { email, password });
-    
-    // Check if OTP is required
-    if (response.data.requires_otp) {
-      localStorage.setItem("pending_admin_email", response.data.email);
+    const data = response.data;
+
+    // Admin OTP required — store pending details and signal the caller
+    if (data.status === "ADMIN_OTP_REQUIRED") {
+      localStorage.setItem("pending_admin_email", email);
+      if (data.admin_id) localStorage.setItem("pending_admin_id", data.admin_id);
       throw new Error("OTP_REQUIRED");
     }
-    
-    const { access, refresh, user: userData } = response.data;
-    localStorage.setItem("access_token", access);
-    localStorage.setItem("refresh_token", refresh);
+
+    // Support both access_token (backend) and access (standard JWT) field names
+    const accessToken = data.access_token || data.access;
+    const refreshToken = data.refresh_token || data.refresh;
+    const userData = data.user || { email, role: data.role || "user" };
+
+    localStorage.setItem("access_token", accessToken);
+    localStorage.setItem("refresh_token", refreshToken);
     localStorage.setItem("auth_user", JSON.stringify(userData));
-    localStorage.setItem("admin_user", JSON.stringify(userData));
+    if (userData.role === "admin" || userData.role === "superadmin") {
+      localStorage.setItem("admin_user", JSON.stringify(userData));
+    }
     setUser(userData);
     return userData;
+  };
+
+  const register = async (username, email, password) => {
+    const response = await api.post("/api/register/", {
+      username,
+      email,
+      password,
+      confirm_password: password,
+    });
+    const data = response.data;
+
+    const accessToken = data.access_token || data.access;
+    const refreshToken = data.refresh_token || data.refresh;
+    const userData = data.user || { email, role: "user" };
+
+    localStorage.setItem("access_token", accessToken);
+    localStorage.setItem("refresh_token", refreshToken);
+    localStorage.setItem("auth_user", JSON.stringify(userData));
+    setUser(userData);
+    return { userData, redirect: data.redirect };
   };
 
   const loginWithOTP = async (email, otpCode) => {
@@ -43,13 +71,18 @@ export function AuthProvider({ children }) {
       email,
       otp_code: otpCode,
     });
-    
-    const { access, refresh, user: userData } = response.data;
-    localStorage.setItem("access_token", access);
-    localStorage.setItem("refresh_token", refresh);
+    const data = response.data;
+
+    const accessToken = data.access_token || data.access;
+    const refreshToken = data.refresh_token || data.refresh;
+    const userData = data.user || { email, role: "admin" };
+
+    localStorage.setItem("access_token", accessToken);
+    localStorage.setItem("refresh_token", refreshToken);
     localStorage.setItem("auth_user", JSON.stringify(userData));
     localStorage.setItem("admin_user", JSON.stringify(userData));
     localStorage.removeItem("pending_admin_email");
+    localStorage.removeItem("pending_admin_id");
     setUser(userData);
     return userData;
   };
@@ -68,16 +101,16 @@ export function AuthProvider({ children }) {
       localStorage.removeItem("auth_user");
       localStorage.removeItem("admin_user");
       localStorage.removeItem("pending_admin_email");
+      localStorage.removeItem("pending_admin_id");
       setUser(null);
     }
   };
 
-  // Role helpers
   const isAdmin = user?.role === "admin" || user?.role === "superadmin";
   const isUser = user?.role === "user" || !user?.role;
 
   return (
-    <AuthContext.Provider value={{ user, login, loginWithOTP, logout, loading: loading, isAdmin, isUser }}>
+    <AuthContext.Provider value={{ user, login, register, loginWithOTP, logout, loading, isAdmin, isUser }}>
       {children}
     </AuthContext.Provider>
   );
