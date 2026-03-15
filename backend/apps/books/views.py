@@ -232,19 +232,39 @@ def image_diagnostic(request):
     from django.conf import settings as dj_settings
 
     # Cloudinary status
-    cloudinary_storage = getattr(dj_settings, 'CLOUDINARY_STORAGE', {})
-    default_storage = getattr(dj_settings, 'DEFAULT_FILE_STORAGE', '')
+    cloudinary_storage_cfg = getattr(dj_settings, 'CLOUDINARY_STORAGE', {})
+    default_storage_setting = getattr(dj_settings, 'DEFAULT_FILE_STORAGE', '')
+
+    # Check the actual storage class Django is using at runtime
+    from django.core.files.storage import default_storage as ds
+    actual_storage_class = type(ds).__name__
+    try:
+        wrapped = getattr(ds, '_wrapped', None)
+        actual_storage_class = type(wrapped).__name__ if wrapped else type(ds).__name__
+    except Exception:
+        pass
+
+    # Check if cloudinary SDK is configured
+    try:
+        import cloudinary
+        cld_config = cloudinary.config()
+        cloudinary_sdk_cloud = getattr(cld_config, 'cloud_name', None)
+    except Exception as e:
+        cloudinary_sdk_cloud = f'ERROR: {e}'
+
     cloudinary_info = {
-        'cloudinary_configured': bool(cloudinary_storage.get('CLOUD_NAME')),
-        'cloud_name': cloudinary_storage.get('CLOUD_NAME', 'NOT SET'),
-        'default_file_storage': default_storage,
-        'using_cloudinary': 'cloudinary' in default_storage.lower(),
+        'settings_cloudinary_configured': bool(cloudinary_storage_cfg.get('CLOUD_NAME')),
+        'settings_cloud_name': cloudinary_storage_cfg.get('CLOUD_NAME', 'NOT SET'),
+        'settings_default_file_storage': default_storage_setting,
+        'runtime_storage_class': actual_storage_class,
+        'cloudinary_sdk_cloud_name': cloudinary_sdk_cloud,
     }
 
     books = Book.objects.all().order_by('-created_at')
     results = []
     for book in books:
         stored = book.cover_image.name if book.cover_image else None
+        field_storage = type(book.cover_image.storage).__name__ if book.cover_image else None
         try:
             raw_url = book.cover_image.url if book.cover_image else None
         except Exception as e:
@@ -253,6 +273,7 @@ def image_diagnostic(request):
         results.append({
             'title': book.title,
             'stored_name': stored,
+            'field_storage_class': field_storage,
             'raw_url': raw_url,
             'resolved_url': resolved,
         })
