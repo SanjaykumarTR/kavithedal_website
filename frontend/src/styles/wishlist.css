@@ -144,7 +144,7 @@
 
 .wl-img {
   width: 100%;
-  height: 200px;
+  aspect-ratio: 3 / 2;
   object-fit: cover;
   display: block;
 }
@@ -159,6 +159,19 @@
   color: #222;
   margin-bottom: 5px;
   line-height: 1.4;
+}
+
+.wl-title a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.wl-title a:hover {
+  color: #B71C1C;
+}
+
+.wl-actions {
+  margin-top: 10px;
 }
 
 .wl-author {

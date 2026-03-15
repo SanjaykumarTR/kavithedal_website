@@ -27,6 +27,7 @@ urlpatterns = [
     path('api/testimonials/', include('apps.testimonials.urls')),
     path('api/contests/', include('apps.contests.urls')),
     path('api/orders/', include('apps.orders.urls')),
+    path('api/wishlist/', include('apps.wishlist.urls')),
 
     # Secure PDF file access (requires authentication + purchase)
     path('api/books/<uuid:book_id>/pdf/', views.SecureFileView.as_view(), name='secure-pdf'),

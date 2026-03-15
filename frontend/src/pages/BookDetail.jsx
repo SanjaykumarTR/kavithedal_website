@@ -95,6 +95,11 @@ export default function BookDetail() {
   };
 
   const handleAddToCart = () => {
+    if (!user) {
+      alert(language === "en" ? "Please login to add items to your cart" : "கார்ட்டில் சேர்க்க உள்நுழையவும்");
+      navigate("/login");
+      return;
+    }
     addToCart(book);
     alert(language === "en" ? "Added to cart!" : "கார்ட்டில் சேர்க்கப்பட்டது!");
   };

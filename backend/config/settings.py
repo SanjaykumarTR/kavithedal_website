@@ -98,6 +98,7 @@ INSTALLED_APPS = [
     'apps.testimonials',
     'apps.contests',
     'apps.orders',
+    'apps.wishlist',
 ]
 
 # Cloudinary apps only loaded when credentials are present — avoids startup

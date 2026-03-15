@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { CartContext } from "../context/CartContext";
 import { WishlistContext } from "../context/WishlistContext";
 import { LanguageContext } from "../context/LanguageContext";
+import { useAuth } from "../context/AuthContext";
 import PurchaseTypeSelector from "./PurchaseTypeSelector";
 import "../styles/productCard.css";
 
@@ -10,6 +11,7 @@ export default function ProductCard({ book, showBothPrices = false }) {
   const { addToCart } = useContext(CartContext);
   const { toggleWishlist, isInWishlist } = useContext(WishlistContext);
   const { language } = useContext(LanguageContext);
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [purchasing, setPurchasing] = useState(false);
   const [showPurchaseType, setShowPurchaseType] = useState(false);
@@ -72,6 +74,11 @@ export default function ProductCard({ book, showBothPrices = false }) {
   const handleAddToCart = (e) => {
     e.preventDefault();
     e.stopPropagation();
+    if (!user) {
+      alert(t.loginToPurchase);
+      navigate("/login");
+      return;
+    }
     addToCart(book);
     alert(t.addedToCart);
   };
@@ -79,8 +86,12 @@ export default function ProductCard({ book, showBothPrices = false }) {
   const handleWishlist = (e) => {
     e.preventDefault();
     e.stopPropagation();
+    if (!user) {
+      alert(language === "en" ? "Please login to add to wishlist" : "விஷ்லிஸ்ட்டில் சேர்க்க உள்நுழையவும்");
+      navigate("/login");
+      return;
+    }
     toggleWishlist(book);
-    alert(wished ? t.removedFromWishlist : t.addedToWishlist);
   };
 
   const handleBuyNow = async (e) => {
