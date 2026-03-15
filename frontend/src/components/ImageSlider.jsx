@@ -75,7 +75,15 @@ export default function ImageSlider() {
         {slides.map((slide, index) => (
           <SwiperSlide key={index} className="slider-slide">
             <div className="slide-content" data-parallax="0.3">
-              <img src={slide.src} alt={slide.alt} />
+              <img
+                src={slide.src}
+                alt={slide.alt}
+                width="1200"
+                height="460"
+                loading={index === 0 ? "eager" : "lazy"}
+                decoding={index === 0 ? "sync" : "async"}
+                fetchpriority={index === 0 ? "high" : "auto"}
+              />
               <div className="slide-overlay">
                 <div className="slide-text">
                   <span className="slide-badge">{content.badge}</span>

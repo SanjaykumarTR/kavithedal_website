@@ -33,9 +33,17 @@ export default defineConfig({
   // ─── Production Build ───────────────────────────────────────────────────────
   build: {
     outDir: 'dist',
-    // Generate source maps for error tracking (can disable in prod for smaller bundle)
     sourcemap: false,
-    // Chunk size warning threshold (kB)
     chunkSizeWarningLimit: 1000,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // Separate React core from app code → cached independently
+          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+          // Swiper is large (~100kB) — defer loading it from the main bundle
+          'vendor-swiper': ['swiper'],
+        },
+      },
+    },
   },
 })

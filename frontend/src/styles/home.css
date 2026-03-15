@@ -2,6 +2,47 @@
    HOME PAGE - MODERN 3D STYLES
 ================================= */
 
+/* ── Skeleton loader for book cards while books API is loading ──────────────
+   Reserves the exact same space as book card grid → zero CLS */
+.books-loading-row {
+  display: flex;
+  gap: 20px;
+  padding: 50px 40px 20px;
+  overflow: hidden;
+}
+
+.book-card-skeleton {
+  min-width: 220px;
+  flex: 1;
+  height: 420px;
+  border-radius: 20px;
+  background: #f0f0f0;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Shimmer uses transform (GPU-composited, no Paint) instead of background-position */
+.book-card-skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.6) 50%, transparent 100%);
+  transform: translateX(-100%);
+  animation: skeleton-shimmer 1.4s infinite;
+}
+
+@keyframes skeleton-shimmer {
+  to { transform: translateX(100%); }
+}
+
+/* "No books" message */
+.no-books {
+  text-align: center;
+  padding: 60px 20px;
+  color: #888;
+  font-size: 1.1rem;
+}
+
 /* ================= FEATURED LAYOUT ================= */
 .home-featured-layout {
   display: flex;

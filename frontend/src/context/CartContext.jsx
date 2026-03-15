@@ -27,6 +27,7 @@ export const CartProvider = ({ children }) => {
           author: String(authorName),
           category: String(item.category || ''),
           image: String(item.image || ''),
+          book_type: String(item.book_type || 'physical'),
           qty: Number(item.qty) || 1,
           price: Number(item.price) || 0,
           oldPrice: Number(item.oldPrice) || 0,
@@ -92,12 +93,13 @@ export const CartProvider = ({ children }) => {
         // Get category
         const category = book.category || '';
         
-        const newItem = { 
+        const newItem = {
           id: String(book.id),
           title: String(book.title || ''),
           author: String(authorName),
           category: String(category),
           image: String(coverImage),
+          book_type: String(book.book_type || 'physical'),
           qty: 1,
           price: Math.round(price * 100) / 100,
           oldPrice: Math.round(oldPrice * 100) / 100,

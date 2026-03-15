@@ -202,30 +202,6 @@ export default function Home() {
       .catch(() => {});
   }, []);
 
-  // Show loading state
-  if (loading) {
-    return (
-      <div className="loading-container">
-        <div className="loading">Loading books...</div>
-      </div>
-    );
-  }
-
-  // Show empty state
-  if (!loading && books.length === 0) {
-    return (
-      <div className="empty-container">
-        <div className="parallax-bg">
-          <div className="parallax-shape parallax-shape-1"></div>
-          <div className="parallax-shape parallax-shape-2"></div>
-        </div>
-        <ImageSlider />
-        <PromoSection />
-        <div className="no-books">No books available. Please add books in the admin panel.</div>
-      </div>
-    );
-  }
-
   return (
     <>
       {/* Parallax Background Shapes */}
@@ -234,8 +210,25 @@ export default function Home() {
         <div className="parallax-shape parallax-shape-2"></div>
       </div>
 
+      {/* ImageSlider and PromoSection render immediately — never block on books API */}
       <ImageSlider />
       <PromoSection />
+
+      {/* ================= BOOKS SECTIONS ================= */}
+      {loading ? (
+        <div className="books-loading-row">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="book-card-skeleton" />
+          ))}
+        </div>
+      ) : books.length === 0 ? (
+        <div className="no-books">
+          {language === "en"
+            ? "No books available. Please add books in the admin panel."
+            : "புத்தகங்கள் இல்லை. நிர்வாக பகுதியில் புத்தகங்கள் சேர்க்கவும்."}
+        </div>
+      ) : (
+        <>
 
       {/* ================= FEATURED SECTION ================= */}
       <section className="home-section home-featured-layout">
@@ -276,6 +269,10 @@ export default function Home() {
             <img
               src={premiumAds[currentPremiumAd].image}
               alt="Offer"
+              width="600"
+              height="380"
+              loading="lazy"
+              decoding="async"
             />
             <div className="ad-overlay">
               <h3>
@@ -332,6 +329,10 @@ export default function Home() {
             <img
               src={sideAds[currentSideAd].image}
               alt="Offer"
+              width="600"
+              height="380"
+              loading="lazy"
+              decoding="async"
               onError={(e) => {
                 e.target.src =
                   "https://images.unsplash.com/photo-1512820790803-83ca734da794?auto=format&fit=crop&w=600&q=80";
@@ -371,6 +372,9 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+        </>
+      )} {/* end books loading/empty/content block */}
 
       {/* ================= TESTIMONIALS SECTION ================= */}
       {testimonials.length > 0 && (
@@ -464,6 +468,10 @@ export default function Home() {
                       <img
                         src={contest.banner_url}
                         alt={contest.title}
+                        width="600"
+                        height="300"
+                        loading="lazy"
+                        decoding="async"
                         onError={(e) => { e.target.parentElement.innerHTML = '<div class="contest-banner-placeholder">🏆</div>'; }}
                       />
                     </div>

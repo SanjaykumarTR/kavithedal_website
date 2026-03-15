@@ -159,11 +159,6 @@ export default function PhysicalPurchase() {
       return;
     }
     
-    if (!deliveryInfo) {
-      setError("Please check delivery availability first");
-      return;
-    }
-    
     setSubmitting(true);
     setError("");
     
@@ -179,8 +174,7 @@ export default function PhysicalPurchase() {
         shipping_city: formData.shipping_city,
         shipping_state: formData.shipping_state,
         shipping_pincode: formData.shipping_pincode,
-        pincode: formData.shipping_pincode,
-        delivery_charge: deliveryInfo?.delivery_charge || 0
+        pincode: formData.shipping_pincode
       });
       
       if (response.data.purchased || response.data.status === "completed") {
@@ -211,9 +205,18 @@ export default function PhysicalPurchase() {
     );
   }
   
-  const bookPrice = book.physical_price || book.price;
-  const deliveryCharge = deliveryInfo?.delivery_charge || 0;
-  const totalPrice = deliveryInfo?.total_price || bookPrice;
+  const bookPrice = parseFloat(book.physical_price || book.price || 0);
+
+  function calcDeliveryCharge(total) {
+    if (total <= 0) return 0;
+    if (total < 500) return 40;
+    if (total < 1000) return 30;
+    return 20;
+  }
+
+  // Auto-calculate delivery charge based on book price
+  const deliveryCharge = calcDeliveryCharge(bookPrice);
+  const totalPrice = bookPrice + deliveryCharge;
   
   return (
     <div className="ebook-purchase-page">
@@ -230,33 +233,29 @@ export default function PhysicalPurchase() {
             </div>
           </div>
           
-          {deliveryInfo && (
-            <div className="delivery-summary">
-              <h3>{t.deliveryAvailable}</h3>
-              <div className="delivery-details">
-                <div className="delivery-row">
-                  <span>{t.deliveryCharge}:</span>
-                  <span>₹{deliveryCharge}</span>
-                </div>
-                <div className="delivery-row total">
-                  <span>{t.totalPrice}:</span>
-                  <span>₹{totalPrice}</span>
-                </div>
-                {deliveryInfo.estimated_delivery_date && (
-                  <div className="delivery-row">
-                    <span>{t.estimatedDelivery}:</span>
-                    <span>{new Date(deliveryInfo.estimated_delivery_date).toLocaleDateString()}</span>
-                  </div>
-                )}
-                {deliveryInfo.city && deliveryInfo.state && (
-                  <div className="delivery-row">
-                    <span>Delivery to:</span>
-                    <span>{deliveryInfo.city}, {deliveryInfo.state}</span>
-                  </div>
-                )}
+          <div className="delivery-summary">
+            <h3>{t.deliveryAvailable}</h3>
+            <div className="delivery-details">
+              <div className="delivery-row">
+                <span>{t.price}:</span>
+                <span>₹{bookPrice}</span>
               </div>
+              <div className="delivery-row">
+                <span>{t.deliveryCharge}:</span>
+                <span>₹{deliveryCharge}</span>
+              </div>
+              <div className="delivery-row total">
+                <span>{t.totalPrice}:</span>
+                <span>₹{totalPrice}</span>
+              </div>
+              {deliveryInfo?.estimated_delivery_date && (
+                <div className="delivery-row">
+                  <span>{t.estimatedDelivery}:</span>
+                  <span>{new Date(deliveryInfo.estimated_delivery_date).toLocaleDateString()}</span>
+                </div>
+              )}
             </div>
-          )}
+          </div>
         </div>
         
         <div className="purchase-right">
@@ -357,7 +356,7 @@ export default function PhysicalPurchase() {
             <button 
               type="submit" 
               className="btn-proceed"
-              disabled={submitting || !deliveryInfo}
+              disabled={submitting}
             >
               {submitting ? t.processing : `${t.proceedToPay} (₹${totalPrice})`}
             </button>

@@ -7,7 +7,8 @@ from .views import (
     OrderViewSet, PaymentViewSet, UserLibraryViewSet,
     CreateOrderView, VerifyPaymentView,
     EbookPurchaseView, VerifyEbookPaymentView,
-    DeliveryZoneViewSet, CartCheckoutView, CartPaymentVerifyView
+    DeliveryZoneViewSet, CartCheckoutView, CartPaymentVerifyView,
+    CalculateDeliveryView,
 )
 
 router = DefaultRouter()
@@ -28,4 +29,5 @@ urlpatterns = [
     path('verify-ebook-payment/', VerifyEbookPaymentView.as_view(), name='verify-ebook-payment'),
     path('cart-checkout/', CartCheckoutView.as_view(), name='cart-checkout'),
     path('cart-verify-payment/', CartPaymentVerifyView.as_view(), name='cart-verify-payment'),
+    path('calculate-delivery/', CalculateDeliveryView.as_view(), name='calculate-delivery'),
 ]

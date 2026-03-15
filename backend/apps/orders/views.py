@@ -21,6 +21,26 @@ def _razorpay_configured():
     )
 
 
+def calculate_delivery_charge(total_price):
+    """
+    Calculate delivery charge for physical books based on order total.
+    Rules:
+      < ₹500  → ₹40
+      ₹500–₹999 → ₹30
+      ≥ ₹1000 → ₹20
+    eBooks always get ₹0.
+    """
+    total = float(total_price)
+    if total <= 0:
+        return 0
+    if total < 500:
+        return 40
+    elif total < 1000:
+        return 30
+    else:
+        return 20
+
+
 def _get_razorpay_client():
     """Lazy import razorpay client only when needed."""
     import razorpay
@@ -177,49 +197,39 @@ class DeliveryZoneViewSet(viewsets.ReadOnlyModelViewSet):
     @action(detail=False, methods=['post'])
     def calculate_delivery(self, request):
         """
-        Calculate delivery charge for a given PIN code.
-        
-        Delivery charges based on PIN code distance from Dharmapuri:
-        - PIN codes starting with 636 → ₹40 (Local)
-        - PIN codes starting with 600 → ₹70 (Nearby)
-        - All other locations → ₹90 (Standard)
+        Calculate delivery charge based on book price (price-based tiers).
+        PIN code is used only to estimate delivery time.
+
+        Delivery charge tiers (by order total):
+          < ₹500  → ₹40
+          ₹500–₹999 → ₹30
+          ≥ ₹1000 → ₹20
         """
-        pincode = request.data.get('pincode')
+        pincode = request.data.get('pincode', '')
         book_price = request.data.get('book_price', 0)
-        
-        if not pincode:
-            return Response(
-                {'error': 'pincode is required'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        # Clean PIN code (remove any spaces or special characters)
-        pincode = pincode.strip()
-        
-        # Calculate delivery charge based on PIN code prefix
-        if pincode.startswith('636'):
-            delivery_charge = 40.00
-            zone_type = 'local'
-            min_days = 2
-            max_days = 3
-        elif pincode.startswith('600'):
-            delivery_charge = 70.00
-            zone_type = 'nearby'
-            min_days = 3
-            max_days = 5
-        else:
-            delivery_charge = 90.00
-            zone_type = 'standard'
-            min_days = 5
-            max_days = 7
-        
+
         book_price_float = float(book_price) if book_price else 0
+
+        # Price-based delivery charge
+        delivery_charge = calculate_delivery_charge(book_price_float)
+
+        # Pincode used only for delivery time estimate
+        pincode = pincode.strip() if pincode else ''
+        if pincode.startswith('636'):
+            zone_type = 'local'
+            min_days, max_days = 2, 3
+        elif pincode.startswith('600'):
+            zone_type = 'nearby'
+            min_days, max_days = 3, 5
+        else:
+            zone_type = 'standard'
+            min_days, max_days = 5, 7
+
         total_price = book_price_float + delivery_charge
-        
-        # Calculate estimated delivery date
+
         from datetime import date, timedelta
         estimated_date = date.today() + timedelta(days=max_days)
-        
+
         return Response({
             'pincode': pincode,
             'delivery_charge': delivery_charge,
@@ -319,11 +329,6 @@ class CreateOrderView(APIView):
         
         # Get the appropriate price
         if order_type == 'ebook':
-            if not book.pdf_file:
-                return Response(
-                    {'error': 'eBook not available for this book'},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
             unit_price = book.ebook_price
             if not unit_price:
                 return Response(
@@ -339,8 +344,7 @@ class CreateOrderView(APIView):
                     {'error': 'Physical book price not set'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
-            # Get delivery charge from request or calculate
-            delivery_charge = float(request.data.get('delivery_charge', 0))
+            delivery_charge = calculate_delivery_charge(float(unit_price))
             total_price = float(unit_price) + delivery_charge
         
         # Get shipping details
@@ -599,12 +603,6 @@ class EbookPurchaseView(APIView):
             )
         
         # Get eBook price
-        if not book.pdf_file:
-            return Response(
-                {'error': 'eBook not available for this book'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
         unit_price = book.ebook_price
         if not unit_price:
             return Response(
@@ -830,6 +828,28 @@ This is an automated notification from Kavithedal Publications.
         })
 
 
+class CalculateDeliveryView(APIView):
+    """
+    Public API to calculate delivery charge based on physical books total.
+    Returns items_total, delivery_charge, and final_total.
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        items_total = request.data.get('items_total', 0)
+        try:
+            items_total = float(items_total)
+        except (TypeError, ValueError):
+            return Response({'error': 'items_total must be a number'}, status=status.HTTP_400_BAD_REQUEST)
+
+        delivery_charge = calculate_delivery_charge(items_total)
+        return Response({
+            'items_total': round(items_total, 2),
+            'delivery_charge': delivery_charge,
+            'final_total': round(items_total + delivery_charge, 2),
+        })
+
+
 class CartCheckoutView(APIView):
     """
     API View to create a Razorpay order for cart checkout.
@@ -939,23 +959,42 @@ class CartPaymentVerifyView(APIView):
             # Payment verified successfully - create orders for each item
             from apps.books.models import Book
             created_orders = []
-            
+
+            # Calculate delivery charge based on physical books total
+            physical_total = sum(
+                float(item.get('price', 0)) * int(item.get('qty', 1))
+                for item in items
+                if item.get('book_type', 'physical') != 'ebook'
+            )
+            total_delivery_charge = calculate_delivery_charge(physical_total)
+
+            # Assign delivery charge to first physical item only
+            delivery_charge_assigned = False
+
             for item in items:
                 book_id = item.get('book_id')
                 quantity = item.get('qty', 1)
-                
+                item_book_type = item.get('book_type', 'physical')
+
                 try:
                     book = Book.objects.get(id=book_id)
-                    
+
+                    item_delivery = 0
+                    if item_book_type != 'ebook' and not delivery_charge_assigned:
+                        item_delivery = total_delivery_charge
+                        delivery_charge_assigned = True
+
+                    item_total = float(item.get('price', 0)) * quantity + item_delivery
+
                     # Create order for this item
                     order = Order.objects.create(
                         user=request.user,
                         book=book,
-                        order_type='physical',
+                        order_type=item_book_type,
                         quantity=quantity,
                         book_price=item.get('price', 0),
-                        delivery_charge=0,
-                        total_price=float(item.get('price', 0)) * quantity,
+                        delivery_charge=item_delivery,
+                        total_price=item_total,
                         status='completed',
                         delivery_status='pending',
                         payment_status='completed',
@@ -965,14 +1004,14 @@ class CartPaymentVerifyView(APIView):
                         full_name=request.user.get_full_name() or '',
                         email=request.user.email,
                     )
-                    
+
                     # Create payment record
                     Payment.objects.create(
                         order=order,
                         razorpay_order_id=razorpay_order_id,
                         razorpay_payment_id=razorpay_payment_id,
                         razorpay_signature=razorpay_signature,
-                        amount=float(item.get('price', 0)) * quantity,
+                        amount=item_total,
                         status='completed',
                         payment_method='razorpay',
                         transaction_id=razorpay_payment_id

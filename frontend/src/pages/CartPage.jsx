@@ -29,8 +29,23 @@ export default function CartPage() {
   const [loading, setLoading] = useState(false);
 
   const subtotal = Math.round(cart.reduce((sum, item) => sum + item.price * item.qty, 0) * 100) / 100;
-  const shipping = subtotal > 0 && subtotal < 500 ? 50 : 0;
-  const total = Math.round((subtotal + shipping) * 100) / 100;
+
+  // Delivery charge applies only to physical books, based on their subtotal
+  const physicalSubtotal = Math.round(
+    cart
+      .filter(item => item.book_type !== 'ebook')
+      .reduce((sum, item) => sum + item.price * item.qty, 0) * 100
+  ) / 100;
+
+  function calcDeliveryCharge(total) {
+    if (total <= 0) return 0;
+    if (total < 500) return 40;
+    if (total < 1000) return 30;
+    return 20;
+  }
+
+  const deliveryCharge = calcDeliveryCharge(physicalSubtotal);
+  const total = Math.round((subtotal + deliveryCharge) * 100) / 100;
 
   const handlePayment = async () => {
     // Check if user is logged in
@@ -61,7 +76,8 @@ export default function CartPage() {
       const itemsForBackend = cart.map(item => ({
         book_id: item.id,
         qty: item.qty,
-        price: item.price
+        price: item.price,
+        book_type: item.book_type || 'physical',
       }));
 
       const orderResponse = await api.post("/api/orders/cart-checkout/", {
@@ -215,28 +231,30 @@ export default function CartPage() {
             </h3>
 
             <div className="summary-row">
-              <span>{language === "en" ? "Subtotal" : "Subtotal"}</span>
-              <span>Rs.{subtotal.toFixed(2)}</span>
+              <span>{language === "en" ? "Books Total" : "புத்தகங்கள் மொத்தம்"}</span>
+              <span>₹{subtotal.toFixed(2)}</span>
             </div>
 
             <div className="summary-row">
-              <span>
-                {language === "en" ? "Shipping" : "Shipping"}
-              </span>
-              <span className={shipping === 0 ? "free-tag" : ""}>
-                {shipping === 0
-                  ? language === "en"
-                    ? "FREE"
-                    : "FREE"
-                  : "Rs." + shipping}
+              <span>{language === "en" ? "Delivery Charge" : "டெலிவரி கட்டணம்"}</span>
+              <span className={deliveryCharge === 0 ? "free-tag" : ""}>
+                {deliveryCharge === 0
+                  ? language === "en" ? "FREE" : "இலவசம்"
+                  : "₹" + deliveryCharge}
               </span>
             </div>
 
-            {shipping > 0 && (
+            {physicalSubtotal > 0 && (
               <p className="free-ship-note">
-                {language === "en"
-                  ? "Add Rs." + (500 - subtotal).toFixed(2) + " more for FREE shipping"
-                  : "Add Rs." + (500 - subtotal).toFixed(2) + " for FREE shipping"}
+                {physicalSubtotal < 500
+                  ? language === "en"
+                    ? `Add ₹${(500 - physicalSubtotal).toFixed(2)} more to reduce delivery to ₹30`
+                    : `₹30 டெலிவரிக்கு ₹${(500 - physicalSubtotal).toFixed(2)} மேலும் சேர்க்கவும்`
+                  : physicalSubtotal < 1000
+                  ? language === "en"
+                    ? `Add ₹${(1000 - physicalSubtotal).toFixed(2)} more to reduce delivery to ₹20`
+                    : `₹20 டெலிவரிக்கு ₹${(1000 - physicalSubtotal).toFixed(2)} மேலும் சேர்க்கவும்`
+                  : null}
               </p>
             )}
 
@@ -244,9 +262,9 @@ export default function CartPage() {
 
             <div className="summary-total-row">
               <span className="total-label">
-                {language === "en" ? "Total" : "Total"}
+                {language === "en" ? "Final Total" : "இறுதி மொத்தம்"}
               </span>
-              <span className="total-amount">Rs.{total.toFixed(2)}</span>
+              <span className="total-amount">₹{total.toFixed(2)}</span>
             </div>
 
             <button className="pay-now-btn" onClick={handlePayment} disabled={loading}>

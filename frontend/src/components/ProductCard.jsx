@@ -109,6 +109,10 @@ export default function ProductCard({ book, showBothPrices = false }) {
         <img
           src={book.image}
           alt={book.title}
+          width="220"
+          height="300"
+          loading="lazy"
+          decoding="async"
           onError={(e) => {
             const target = e.target;
             const src = target.src;
