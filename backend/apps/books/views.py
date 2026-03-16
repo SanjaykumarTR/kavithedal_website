@@ -8,6 +8,7 @@ from rest_framework.views import APIView
 from django.http import FileResponse, Http404
 from django.conf import settings
 import os
+import time
 import logging
 
 logger = logging.getLogger('apps')
@@ -127,10 +128,25 @@ class SecureFileView(APIView):
                 status=status.HTTP_404_NOT_FOUND
             )
 
-        # Return the Cloudinary (or local dev) URL — the access check above
-        # already verified the user is authorised. The frontend opens this URL.
+        # Generate a signed Cloudinary URL (valid for 1 hour) so authenticated
+        # resources are accessible without exposing permanent links.
         try:
-            pdf_url = book.pdf_file.url
+            try:
+                import cloudinary.utils
+                public_id = book.pdf_file.name  # e.g. media/books/pdfs/filename.pdf
+                expires_at = int(time.time()) + 3600
+                pdf_url, _ = cloudinary.utils.cloudinary_url(
+                    public_id,
+                    resource_type='raw',
+                    type='authenticated',
+                    sign_url=True,
+                    expires_at=expires_at,
+                )
+                if not pdf_url:
+                    raise ValueError('Empty signed URL')
+            except Exception:
+                # Fallback: use the plain URL (works for public delivery type)
+                pdf_url = book.pdf_file.url
         except Exception as e:
             logger.error('Could not resolve PDF URL for book %s: %s', book_id, e)
             return Response(
