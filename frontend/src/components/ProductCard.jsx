@@ -15,17 +15,19 @@ export default function ProductCard({ book, showBothPrices = false }) {
   const navigate = useNavigate();
   const [purchasing, setPurchasing] = useState(false);
   const [showPurchaseType, setShowPurchaseType] = useState(false);
+  const [toast, setToast] = useState({ msg: "", type: "" });
+
   const wished = isInWishlist(book.id);
-  
-  // Translations
+
   const translations = {
     en: {
       buyNow: "Buy Now",
       addToCart: "Add to Cart",
       addedToCart: "Added to cart!",
-      addedToWishlist: "Added to wishlist!",
-      removedFromWishlist: "Removed from wishlist!",
+      addedToWishlist: "Book added to your wishlist.",
+      removedFromWishlist: "Removed from wishlist.",
       loginToPurchase: "Please login to purchase books",
+      loginForWishlist: "Please login to add to wishlist",
       purchaseSuccess: "Purchase successful!",
       addedToLibrary: "has been added to your library",
       ordered: "has been ordered",
@@ -40,9 +42,10 @@ export default function ProductCard({ book, showBothPrices = false }) {
       buyNow: "இப்போது வாங்கு",
       addToCart: "கார்ட்டில் சேர்",
       addedToCart: "கார்ட்டில் சேர்க்கப்பட்டது!",
-      addedToWishlist: "விஷ்லிஸ்ட்டில் சேர்க்கப்பட்டது!",
-      removedFromWishlist: "விஷ்லிஸ்ட்டில் இருந்து நீக்கப்பட்டது!",
+      addedToWishlist: "புத்தகம் விருப்பப்பட்டியலில் சேர்க்கப்பட்டது.",
+      removedFromWishlist: "விருப்பப்பட்டியலில் இருந்து நீக்கப்பட்டது.",
       loginToPurchase: "புத்தகங்களை வாங்க உள்நுழையவும்",
+      loginForWishlist: "விருப்பப்பட்டியலில் சேர்க்க உள்நுழையவும்",
       purchaseSuccess: "வாங்கியது வெற்றியாக உள்ளது!",
       addedToLibrary: "உங்கள் நூலகத்தில் சேர்க்கப்பட்டது",
       ordered: "ஆணை வழங்கப்பட்டது",
@@ -54,19 +57,20 @@ export default function ProductCard({ book, showBothPrices = false }) {
       downloadFailed: "பதிவிறக்கத்தில் தோல்வி. மீண்டும் முயற்சிக்கவும்."
     }
   };
-  
-  const t = translations[language];
 
-  // Get prices - support both API response (ebook_price, physical_price) and local data (price)
-  // Use book.price as fallback for physical price when not available
+  const t = translations[language] || translations.en;
+
+  const showToast = (msg, type = "success") => {
+    setToast({ msg, type });
+    setTimeout(() => setToast({ msg: "", type: "" }), 2500);
+  };
+
+  // Prices
   const ebookPrice = book.ebook_price || book.price;
   const physicalPrice = book.physical_price || book.price;
   const hasEbook = book.ebook_price != null && book.ebook_price > 0;
   const hasPhysical = (book.physical_price != null && book.physical_price > 0) || book.price > 0;
-  // Always show both prices when either ebook or physical is available
   const showBoth = hasEbook || hasPhysical;
-  
-  // Get discounted/final prices from API
   const ebookFinalPrice = book.ebook_final_price || ebookPrice;
   const physicalFinalPrice = book.physical_final_price || physicalPrice;
   const hasDiscount = book.discount_percentage > 0;
@@ -75,42 +79,48 @@ export default function ProductCard({ book, showBothPrices = false }) {
     e.preventDefault();
     e.stopPropagation();
     if (!user) {
-      alert(t.loginToPurchase);
       navigate("/login");
       return;
     }
     addToCart(book);
-    alert(t.addedToCart);
+    showToast(t.addedToCart, "success");
   };
 
   const handleWishlist = (e) => {
     e.preventDefault();
     e.stopPropagation();
     if (!user) {
-      alert(language === "en" ? "Please login to add to wishlist" : "விஷ்லிஸ்ட்டில் சேர்க்க உள்நுழையவும்");
       navigate("/login");
       return;
     }
+    const willRemove = isInWishlist(book.id);
     toggleWishlist(book);
+    showToast(
+      willRemove ? t.removedFromWishlist : t.addedToWishlist,
+      willRemove ? "info" : "success"
+    );
   };
 
   const handleBuyNow = async (e) => {
     e.preventDefault();
     e.stopPropagation();
-    
     const token = localStorage.getItem("access_token");
     if (!token) {
-      alert(t.loginToPurchase);
       navigate("/login");
       return;
     }
-    
-    // Show purchase type selector
     setShowPurchaseType(true);
   };
 
   return (
     <div className="product-card-wrapper">
+      {/* Inline toast */}
+      {toast.msg && (
+        <div className={`card-toast card-toast--${toast.type}`}>
+          {toast.msg}
+        </div>
+      )}
+
       <Link to={`/book/${book.id}`} className="product-card">
         {/* Discount Badge */}
         {book.discount_percentage > 0 && (
@@ -127,8 +137,6 @@ export default function ProductCard({ book, showBothPrices = false }) {
           onError={(e) => {
             const target = e.target;
             const src = target.src;
-            // All files use /image/upload/ (MediaCloudinaryStorage.RESOURCE_TYPE='image')
-            // Fall back to /raw/upload/ in case of old stored data, then use placeholder
             if (src && src.includes('res.cloudinary.com') && !target.dataset.retried) {
               target.dataset.retried = 'true';
               if (src.includes('/raw/upload/')) {
@@ -196,15 +204,17 @@ export default function ProductCard({ book, showBothPrices = false }) {
         </div>
       </Link>
 
-      {/* Action buttons outside the Link */}
+      {/* Action buttons */}
       <div className="card-actions">
-        {/* Wishlist */}
         <div
           className={`wishlist ${wished ? "active" : ""}`}
           onClick={handleWishlist}
-          title={wished ? "Remove from Wishlist" : "Add to Wishlist"}
+          title={wished
+            ? (language === "en" ? "Remove from Wishlist" : "நீக்கவும்")
+            : (language === "en" ? "Add to Wishlist" : "விருப்பத்தில் சேர்")}
+          aria-label={wished ? "Remove from wishlist" : "Add to wishlist"}
         >
-          ♥
+          {wished ? "❤️" : "🤍"}
         </div>
         <button className="buy-now-btn" onClick={handleBuyNow} disabled={purchasing}>
           {purchasing ? "..." : t.buyNow}
@@ -214,11 +224,10 @@ export default function ProductCard({ book, showBothPrices = false }) {
         </button>
       </div>
 
-      {/* Purchase Type Selector Modal */}
       {showPurchaseType && (
-        <PurchaseTypeSelector 
-          book={book} 
-          onClose={() => setShowPurchaseType(false)} 
+        <PurchaseTypeSelector
+          book={book}
+          onClose={() => setShowPurchaseType(false)}
         />
       )}
     </div>

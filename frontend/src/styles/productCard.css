@@ -552,6 +552,45 @@
 
 
 /* ===============================
+   CARD TOAST NOTIFICATION
+   ================================= */
+.card-toast {
+  position: absolute;
+  top: -48px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 8px 18px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  z-index: 100;
+  pointer-events: none;
+  animation: toastSlideIn 0.3s ease forwards;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+
+.card-toast--success {
+  background: #2E7D32;
+  color: #fff;
+}
+
+.card-toast--info {
+  background: #1565C0;
+  color: #fff;
+}
+
+.card-toast--error {
+  background: #B71C1C;
+  color: #fff;
+}
+
+@keyframes toastSlideIn {
+  from { opacity: 0; transform: translateX(-50%) translateY(6px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+/* ===============================
    FLOATING PARTICLES BACKGROUND
    ================================= */
 @keyframes float {
