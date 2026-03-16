@@ -192,36 +192,75 @@ class BookSubmissionViewSet(viewsets.ModelViewSet):
         return BookSubmission.objects.none()
     
     def perform_create(self, serializer):
-        # Save the submission
+        from django.conf import settings
+        from django.core.mail import send_mail
+        import logging
+        logger = logging.getLogger('apps')
+
         submission = serializer.save()
-        
-        # Send email to admin
+
+        admin_email = getattr(settings, 'ADMIN_EMAIL', '')
+        from_email = getattr(settings, 'DEFAULT_FROM_EMAIL', '')
+
+        # ── Email 1: Admin notification ─────────────────────────────────────
+        admin_subject = f'📚 New Book Submission: {submission.book_title}'
+        admin_message = f"""
+New book submission received on Kavithedal Publications.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SUBMISSION DETAILS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Author Name  : {submission.name}
+Email        : {submission.email}
+Phone        : {submission.contact}
+Book Title   : {submission.book_title}
+Submitted On : {submission.created_at.strftime('%d %b %Y, %I:%M %p')}
+Status       : {submission.status.upper()}
+
+DESCRIPTION:
+{submission.description}
+
+{"PDF/File: Attached (download from admin panel)" if submission.file else "PDF/File: Not provided"}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Review this submission in the admin panel:
+https://kavithedal.com/admin/books/booksubmission/
+
+Kavithedal Publications — Admin Notification
+"""
+        if admin_email:
+            try:
+                send_mail(admin_subject, admin_message, from_email,
+                          [admin_email], fail_silently=True)
+            except Exception as exc:
+                logger.error('BookSubmission admin email failed: %s', exc)
+
+        # ── Email 2: Confirmation to the author ─────────────────────────────
+        author_subject = 'Book Submission Received — Kavithedal Publications'
+        author_message = f"""
+Dear {submission.name},
+
+Thank you for submitting your book to Kavithedal Publications!
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+YOUR SUBMISSION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Book Title   : {submission.book_title}
+Submitted On : {submission.created_at.strftime('%d %b %Y')}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Our editorial team will review your submission and get back to you within
+5–7 business days. We will contact you at this email address.
+
+For any questions, please write to us at {from_email or 'kavithedalpublications@gmail.com'}
+
+Warm regards,
+Kavithedal Publications Editorial Team
+"""
         try:
-            from django.conf import settings
-            from django.core.mail import send_mail
-            admin_email = getattr(settings, 'ADMIN_EMAIL', 'kavithedaldpi@gmail.com')
-            subject = f'New Book Submission: {submission.book_title}'
-            message = f"""
-A new book has been submitted for review.
-
-Details:
-- Name: {submission.name}
-- Email: {submission.email}
-- Contact: {submission.contact}
-- Book Title: {submission.book_title}
-- Description: {submission.description}
-
-Please login to the admin panel to review this submission.
-            """
-            send_mail(
-                subject,
-                message,
-                getattr(settings, 'DEFAULT_FROM_EMAIL', 'noreply@kavithedal.com'),
-                [admin_email],
-                fail_silently=False,
-            )
-        except Exception as e:
-            print(f"Error sending email: {e}")
+            send_mail(author_subject, author_message, from_email,
+                      [submission.email], fail_silently=True)
+        except Exception as exc:
+            logger.error('BookSubmission author confirmation email failed: %s', exc)
 
 
 @api_view(['GET'])
