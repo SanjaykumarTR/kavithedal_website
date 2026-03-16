@@ -196,7 +196,7 @@ export default function Reader() {
               </a>
             </div>
             <iframe
-              src={pdfUrl}
+              src={`https://docs.google.com/viewer?url=${encodeURIComponent(pdfUrl)}&embedded=true`}
               className="pdf-viewer"
               title={book?.title}
               onContextMenu={(e) => e.preventDefault()}
