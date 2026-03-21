@@ -187,20 +187,21 @@ export default function Reader() {
               >
                 Open PDF in New Tab
               </a>
-              <a
-                href={pdfUrl}
-                download={book?.title ? `${book.title}.pdf` : "book.pdf"}
-                className="btn-download-pdf"
-              >
-                Download PDF
-              </a>
             </div>
-            <iframe
-              src={`https://docs.google.com/viewer?url=${encodeURIComponent(pdfUrl)}&embedded=true`}
+            <object
+              data={pdfUrl}
+              type="application/pdf"
               className="pdf-viewer"
               title={book?.title}
               onContextMenu={(e) => e.preventDefault()}
-            />
+            >
+              <p style={{ textAlign: "center", padding: "20px" }}>
+                Your browser cannot display this PDF inline.{" "}
+                <a href={pdfUrl} target="_blank" rel="noopener noreferrer">
+                  Click here to open it.
+                </a>
+              </p>
+            </object>
           </>
         )}
       </div>

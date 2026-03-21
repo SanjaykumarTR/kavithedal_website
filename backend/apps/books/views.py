@@ -128,31 +128,36 @@ class SecureFileView(APIView):
                 status=status.HTTP_404_NOT_FOUND
             )
 
-        # Generate a signed Cloudinary URL (valid for 1 hour) so authenticated
-        # resources are accessible without exposing permanent links.
+        # Generate a time-limited signed Cloudinary URL (valid for 1 hour).
+        # PDFs are uploaded via cloudinary_storage as type='upload' (not 'authenticated'),
+        # so we sign against type='upload' to produce a valid expiring URL.
         try:
-            try:
-                import cloudinary.utils
+            import cloudinary.utils
+            import cloudinary
+            cloud_name = getattr(settings, 'CLOUDINARY_STORAGE', {}).get('CLOUD_NAME', '')
+            if cloud_name:
                 public_id = book.pdf_file.name  # e.g. media/books/pdfs/filename.pdf
                 expires_at = int(time.time()) + 3600
                 pdf_url, _ = cloudinary.utils.cloudinary_url(
                     public_id,
                     resource_type='raw',
-                    type='authenticated',
+                    type='upload',
                     sign_url=True,
                     expires_at=expires_at,
                 )
-                if not pdf_url:
-                    raise ValueError('Empty signed URL')
-            except Exception:
-                # Fallback: use the plain URL (works for public delivery type)
+            else:
+                # Cloudinary not configured locally — use the storage URL directly
                 pdf_url = book.pdf_file.url
         except Exception as e:
-            logger.error('Could not resolve PDF URL for book %s: %s', book_id, e)
-            return Response(
-                {'error': 'PDF file is not accessible'},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+            logger.warning('Could not generate signed Cloudinary URL for book %s: %s — falling back to storage URL', book_id, e)
+            try:
+                pdf_url = book.pdf_file.url
+            except Exception as e2:
+                logger.error('Could not resolve PDF URL for book %s: %s', book_id, e2)
+                return Response(
+                    {'error': 'PDF file is not accessible'},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
 
         return Response({'pdf_url': pdf_url, 'title': book.title})
 
