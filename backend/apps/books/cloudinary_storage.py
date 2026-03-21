@@ -13,7 +13,7 @@ try:
         """Storage for image fields — uploads as Cloudinary 'image' type."""
         RESOURCE_TYPE = 'image'
 
-except ImportError:
-    # cloudinary_storage not installed (local dev without Cloudinary configured).
+except (ImportError, Exception):
+    # cloudinary_storage not installed or not configured (local dev).
     # Fall back to the default storage so imports never break.
     from django.core.files.storage import FileSystemStorage as ImageCloudinaryStorage  # noqa: F401

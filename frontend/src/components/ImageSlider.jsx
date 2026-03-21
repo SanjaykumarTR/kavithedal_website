@@ -82,7 +82,7 @@ export default function ImageSlider() {
                 height="460"
                 loading={index === 0 ? "eager" : "lazy"}
                 decoding={index === 0 ? "sync" : "async"}
-                fetchpriority={index === 0 ? "high" : "auto"}
+                fetchPriority={index === 0 ? "high" : "auto"}
               />
               <div className="slide-overlay">
                 <div className="slide-text">

@@ -18,7 +18,7 @@ def _video_storage():
     try:
         from cloudinary_storage.storage import VideoMediaCloudinaryStorage
         return VideoMediaCloudinaryStorage()
-    except ImportError:
+    except (ImportError, Exception):
         from django.core.files.storage import FileSystemStorage
         return FileSystemStorage()
 
