@@ -127,13 +127,14 @@ class SecureFileView(APIView):
                 status=status.HTTP_404_NOT_FOUND
             )
 
-        # Use the storage backend URL. If the PDF was previously uploaded as
-        # Cloudinary 'image' type (auto-detection mistake), switch the URL to
-        # 'raw' so the browser receives the actual PDF bytes, not a PNG render.
+        # Get the storage URL. PDFs previously uploaded as Cloudinary 'image'
+        # type are served as a PNG render by default. Appending '.pdf' tells
+        # Cloudinary to return the original PDF bytes instead.
         try:
             pdf_url = book.pdf_file.url
             if 'res.cloudinary.com' in pdf_url and '/image/upload/' in pdf_url:
-                pdf_url = pdf_url.replace('/image/upload/', '/raw/upload/', 1)
+                if not pdf_url.endswith('.pdf'):
+                    pdf_url = pdf_url + '.pdf'
         except Exception as e:
             logger.error('Could not resolve PDF URL for book %s: %s', book_id, e)
             return Response(
