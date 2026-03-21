@@ -127,11 +127,13 @@ class SecureFileView(APIView):
                 status=status.HTTP_404_NOT_FOUND
             )
 
-        # Use the storage backend URL directly — django-cloudinary-storage already
-        # knows the correct Cloudinary public_id and URL format for this file.
-        # Access is protected by the UserLibrary check above (only purchasers reach here).
+        # Use the storage backend URL. If the PDF was previously uploaded as
+        # Cloudinary 'image' type (auto-detection mistake), switch the URL to
+        # 'raw' so the browser receives the actual PDF bytes, not a PNG render.
         try:
             pdf_url = book.pdf_file.url
+            if 'res.cloudinary.com' in pdf_url and '/image/upload/' in pdf_url:
+                pdf_url = pdf_url.replace('/image/upload/', '/raw/upload/', 1)
         except Exception as e:
             logger.error('Could not resolve PDF URL for book %s: %s', book_id, e)
             return Response(

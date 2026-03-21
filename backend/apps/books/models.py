@@ -8,6 +8,7 @@ from apps.books.validators import (
     validate_image_type, validate_image_size,
     validate_pdf_type, validate_pdf_size,
 )
+from apps.books.cloudinary_storage import RawCloudinaryStorage
 
 
 class Category(models.Model):
@@ -54,6 +55,7 @@ class Book(models.Model):
     book_type = models.CharField(max_length=20, choices=BOOK_TYPE_CHOICES, default='both')
     pdf_file = models.FileField(
         upload_to='books/pdfs/',
+        storage=RawCloudinaryStorage(),
         blank=True,
         null=True,
         validators=[validate_pdf_type, validate_pdf_size],
