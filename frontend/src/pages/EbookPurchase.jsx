@@ -189,7 +189,10 @@ export default function EbookPurchase() {
 
     } catch (error) {
       console.error("Purchase error:", error);
-      setError(error.response?.data?.error || "Failed to process purchase");
+      const msg = error.response?.data?.error
+        || error.response?.data?.detail
+        || (error.response?.status ? `Server error (${error.response.status})` : "Network error — check your connection");
+      setError(msg);
     } finally {
       setSubmitting(false);
     }
