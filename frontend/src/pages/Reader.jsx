@@ -9,20 +9,51 @@
  * - Watermark on every page with user email
  * - Reading progress tracking
  * - No external iframe embedding allowed
+ * - Fallback to iframe viewer if PDF.js fails
  */
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, Suspense } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { LanguageContext } from "../context/LanguageContext";
 import { useAuth } from "../context/AuthContext";
 import api from "../api/axios";
-import Document from "react-pdf/dist/esm/entry.pdf.js";
-import { Document as PDFDocument, Page, pdfjs } from "react-pdf";
-import "react-pdf/dist/esm/Page/AnnotationLayer.css";
-import "react-pdf/dist/esm/Page/TextLayer.css";
 import "../styles/reader.css";
 
-// Set up PDF.js worker
-pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+// PDF.js components - lazy loaded
+import { Document, Page, pdfjs } from "react-pdf";
+import "react-pdf/dist/esm/Page/AnnotationLayer.css";
+import "react-pdf/dist/esm/Page/TextLayer.css";
+
+// Set PDF.js worker to use CDN (more reliable)
+pdfjs.GlobalWorkerOptions.workerSrc = "https://unpkg.com/pdfjs-dist@4.9.155/build/pdf.worker.min.mjs";
+
+// Lazy loaded PDF viewer component
+function PDFViewer({ pdfUrl, currentPage, scale, onLoadSuccess, onPageChange, numPages }) {
+  return (
+    <Document
+      file={pdfUrl}
+      onLoadSuccess={onLoadSuccess}
+      loading={
+        <div className="pdf-loading">
+          <div className="loading-spinner"></div>
+          <p>Loading PDF...</p>
+        </div>
+      }
+      error={
+        <div className="pdf-error">
+          <p>Failed to load PDF</p>
+        </div>
+      }
+    >
+      <Page 
+        pageNumber={currentPage}
+        scale={scale}
+        renderTextLayer={true}
+        renderAnnotationLayer={false}
+        className="pdf-page"
+      />
+    </Document>
+  );
+}
 
 export default function Reader() {
   const { id } = useParams();
@@ -40,6 +71,7 @@ export default function Reader() {
   const [darkMode, setDarkMode] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showControls, setShowControls] = useState(true);
+  const [useFallbackViewer, setUseFallbackViewer] = useState(false);
   const [loadingProgress, setLoadingProgress] = useState(0);
   const containerRef = useRef(null);
   const controlsTimeoutRef = useRef(null);
@@ -68,7 +100,9 @@ export default function Reader() {
       previousPage: "Previous Page",
       nextPage: "Next Page",
       protectedContent: "Protected Content",
-      watermark: "watermark"
+      watermark: "watermark",
+      useFallback: "Use simple viewer",
+      useAdvanced: "Use advanced viewer"
     },
     ta: {
       loading: "உங்கள் புத்தகத்தை ஏற்றுகிறது...",
@@ -84,12 +118,14 @@ export default function Reader() {
       zoomOut: "சிறிதாக்கு",
       fullscreen: "முழு திரை",
       exitFullscreen: "முழு திரையை விடு",
-      darkMode: " இருட்டு பயன்முறை",
+      darkMode: "இருட்டு பயன்முறை",
       lightMode: "வெளிச்ச பயன்முறை",
       previousPage: "முன் பக்கம்",
       nextPage: "அடுத்த பக்கம்",
       protectedContent: "பாதுகாக்கப்படும் உள்ளடக்கம்",
-      watermark: "முத்திரை"
+      watermark: "முத்திரை",
+      useFallback: "எளிய காட்சி",
+      useAdvanced: "மேம்பட்ட காட்சி"
     }
   };
   
@@ -103,76 +139,33 @@ export default function Reader() {
     };
     
     const handleKeyDown = (e) => {
-      // Prevent Ctrl+P (Print)
-      if (e.ctrlKey && e.key === 'p') {
-        e.preventDefault();
-        return false;
-      }
-      // Prevent Ctrl+S (Save)
-      if (e.ctrlKey && e.key === 's') {
-        e.preventDefault();
-        return false;
-      }
-      // Prevent Ctrl+U (View Source)
-      if (e.ctrlKey && e.key === 'u') {
-        e.preventDefault();
-        return false;
-      }
-      // Prevent Ctrl+Shift+I (Developer Tools)
-      if (e.ctrlKey && e.shiftKey && e.key === 'I') {
-        e.preventDefault();
-        return false;
-      }
-      // Prevent F12 (Developer Tools)
-      if (e.key === 'F12') {
-        e.preventDefault();
-        return false;
-      }
-      // Prevent Ctrl+A (Select All)
-      if (e.ctrlKey && e.key === 'a') {
-        e.preventDefault();
-        return false;
-      }
-      // Prevent Ctrl+C (Copy) - only for selected content
-      if (e.ctrlKey && e.key === 'c') {
-        // Allow copy only for input fields
-        if (document.activeElement?.tagName !== 'INPUT' && 
-            document.activeElement?.tagName !== 'TEXTAREA') {
-          e.preventDefault();
-          return false;
-        }
-      }
-      // Prevent Print Screen
-      if (e.key === 'PrintScreen') {
-        e.preventDefault();
-        return false;
-      }
+      if (e.ctrlKey && e.key === 'p') { e.preventDefault(); return false; }
+      if (e.ctrlKey && e.key === 's') { e.preventDefault(); return false; }
+      if (e.ctrlKey && e.key === 'u') { e.preventDefault(); return false; }
+      if (e.ctrlKey && e.shiftKey && e.key === 'I') { e.preventDefault(); return false; }
+      if (e.key === 'F12') { e.preventDefault(); return false; }
+      if (e.ctrlKey && e.key === 'a') { e.preventDefault(); return false; }
+      if (e.key === 'PrintScreen') { e.preventDefault(); return false; }
     };
     
-    // Prevent iframe embedding outside our domain
     const handleBeforeUnload = () => {
       try {
         if (window.self !== window.top) {
           window.top.location = window.self.location;
         }
-      } catch (e) {
-        // Cross-origin restriction
-      }
+      } catch (e) { /* cross-origin restriction */ }
     };
 
     document.addEventListener('contextmenu', handleContextMenu);
     document.addEventListener('keydown', handleKeyDown);
     document.addEventListener('beforeunload', handleBeforeUnload);
     
-    // Check if in iframe and redirect
     try {
       if (window.self !== window.top) {
         document.body.style.display = 'none';
         window.top.location = window.self.location;
       }
-    } catch (e) {
-      // Cross-origin restriction
-    }
+    } catch (e) { /* cross-origin restriction */ }
     
     return () => {
       document.removeEventListener('contextmenu', handleContextMenu);
@@ -185,9 +178,7 @@ export default function Reader() {
   useEffect(() => {
     const handleMouseMove = () => {
       setShowControls(true);
-      if (controlsTimeoutRef.current) {
-        clearTimeout(controlsTimeoutRef.current);
-      }
+      if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
       controlsTimeoutRef.current = setTimeout(() => {
         if (!isFullscreen) return;
         setShowControls(false);
@@ -199,9 +190,7 @@ export default function Reader() {
       container.addEventListener('mousemove', handleMouseMove);
       return () => {
         container.removeEventListener('mousemove', handleMouseMove);
-        if (controlsTimeoutRef.current) {
-          clearTimeout(controlsTimeoutRef.current);
-        }
+        if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
       };
     }
   }, [isFullscreen]);
@@ -219,17 +208,12 @@ export default function Reader() {
           await api.post(`/api/books/${id}/reading-progress/update/`, {
             page: currentPage,
             total_pages: numPages,
-            metadata: {
-              scale,
-              last_position: Date.now(),
-            }
+            metadata: { scale, last_position: Date.now() }
           });
         } catch (err) {
           console.error("Failed to save reading progress:", err);
         }
       };
-      
-      // Debounce progress saving
       const timeoutId = setTimeout(saveProgress, 2000);
       return () => clearTimeout(timeoutId);
     }
@@ -242,7 +226,6 @@ export default function Reader() {
     }
     
     try {
-      // First check if user has purchased the book
       const accessResponse = await api.get(`/api/books/${id}/check-access/`);
       
       if (!accessResponse.data.has_access) {
@@ -251,12 +234,10 @@ export default function Reader() {
         return;
       }
       
-      // Get reading progress if available
       if (accessResponse.data.current_page) {
         setCurrentPage(accessResponse.data.current_page);
       }
       
-      // Check if book has PDF
       const bookResponse = await api.get(`/api/books/${id}/`);
       const bookData = bookResponse.data;
       
@@ -268,7 +249,6 @@ export default function Reader() {
       
       setBook(bookData);
       
-      // Fetch the secure Cloudinary PDF URL from the backend
       try {
         const pdfResponse = await api.get(`/api/books/${id}/pdf/`);
         const url = pdfResponse.data.pdf_url;
@@ -295,13 +275,13 @@ export default function Reader() {
     }
   };
 
-  const onDocumentLoadSuccess = ({ numPages }) => {
-    setNumPages(numPages);
+  const onDocumentLoadSuccess = ({ numPages: pages }) => {
+    setNumPages(pages);
     setLoadingProgress(100);
   };
 
   const onDocumentLoadProgress = ({ loaded, total }) => {
-    setLoadingProgress(Math.round((loaded / total) * 100));
+    if (total > 0) setLoadingProgress(Math.round((loaded / total) * 100));
   };
 
   const changePage = useCallback((offset) => {
@@ -326,20 +306,18 @@ export default function Reader() {
     setDarkMode(prev => !prev);
   }, []);
 
+  const toggleViewer = useCallback(() => {
+    setUseFallbackViewer(prev => !prev);
+  }, []);
+
   // Keyboard navigation
   useEffect(() => {
     const handleKeyNavigation = (e) => {
-      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
-        changePage(1);
-      } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
-        changePage(-1);
-      } else if (e.key === '+' || e.key === '=') {
-        changeScale(scale + 0.1);
-      } else if (e.key === '-') {
-        changeScale(scale - 0.1);
-      }
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') changePage(1);
+      else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') changePage(-1);
+      else if (e.key === '+' || e.key === '=') changeScale(scale + 0.1);
+      else if (e.key === '-') changeScale(scale - 0.1);
     };
-    
     window.addEventListener('keydown', handleKeyNavigation);
     return () => window.removeEventListener('keydown', handleKeyNavigation);
   }, [changePage, changeScale, scale]);
@@ -364,9 +342,7 @@ export default function Reader() {
         <div className="error-icon">🔒</div>
         <h2>{t.accessDenied}</h2>
         <p>{error}</p>
-        <Link to="/library" className="btn-back">
-          {t.backToLibrary}
-        </Link>
+        <Link to="/library" className="btn-back">{t.backToLibrary}</Link>
       </div>
     );
   }
@@ -379,9 +355,7 @@ export default function Reader() {
     >
       {/* Header Controls */}
       <div className={`reader-header ${showControls ? 'visible' : 'hidden'}`}>
-        <Link to="/library" className="btn-back">
-          ← {t.backToLibrary}
-        </Link>
+        <Link to="/library" className="btn-back">← {t.backToLibrary}</Link>
         <h1 className="reader-title">{book?.title}</h1>
         <div className="reader-controls">
           <button onClick={toggleDarkMode} className="control-btn" title={darkMode ? t.lightMode : t.darkMode}>
@@ -397,40 +371,36 @@ export default function Reader() {
       <div className="reader-container">
         {pdfUrl && (
           <div className="pdf-wrapper">
-            <PDFDocument
-              file={pdfUrl}
-              onLoadSuccess={onDocumentLoadSuccess}
-              onLoadProgress={onDocumentLoadProgress}
-              loading={
-                <div className="pdf-loading">
-                  <div className="loading-spinner"></div>
-                  <p>{t.loadingProgress}: {loadingProgress}%</p>
-                </div>
-              }
-              error={
-                <div className="pdf-error">
-                  <p>Failed to load PDF</p>
-                </div>
-              }
-              options={{
-                cMapUrl: 'https://unpkg.com/pdfjs-dist@3.11.174/cmaps/',
-                cMapPacked: true,
-                enableXfa: true,
-              }}
-            >
-              <Page 
-                pageNumber={currentPage}
-                scale={scale}
-                renderTextLayer={true}
-                renderAnnotationLayer={true}
-                className="pdf-page"
-                onRenderError={() => (
-                  <div className="pdf-render-error">
-                    <p>Unable to render this page</p>
-                  </div>
-                )}
-              />
-            </PDFDocument>
+            {/* View toggle for fallback */}
+            <div className="reader-pdf-actions">
+              <button onClick={toggleViewer} className="btn-toggle-viewer">
+                {useFallbackViewer ? t.useAdvanced : t.useFallback}
+              </button>
+            </div>
+
+            {useFallbackViewer ? (
+              // Fallback: iframe viewer (simpler, less secure)
+              <div className="pdf-viewer-fallback">
+                <iframe
+                  src={pdfUrl}
+                  className="pdf-viewer"
+                  title={book?.title}
+                  onError={() => setError("Failed to load PDF in viewer")}
+                />
+              </div>
+            ) : (
+              // Primary: react-pdf viewer
+              <Suspense fallback={<div className="pdf-loading"><div className="loading-spinner"></div><p>Loading viewer...</p></div>}>
+                <PDFViewer
+                  pdfUrl={pdfUrl}
+                  currentPage={currentPage}
+                  scale={scale}
+                  onLoadSuccess={onDocumentLoadSuccess}
+                  onPageChange={setCurrentPage}
+                  numPages={numPages}
+                />
+              </Suspense>
+            )}
             
             {/* Watermark Overlay */}
             <div className="watermark-overlay">
@@ -445,45 +415,18 @@ export default function Reader() {
       {/* Footer Controls */}
       <div className={`reader-footer ${showControls ? 'visible' : 'hidden'}`}>
         <div className="page-navigation">
-          <button 
-            onClick={() => changePage(-1)} 
-            disabled={currentPage <= 1}
-            className="nav-btn"
-            title={t.previousPage}
-          >
-            ←
-          </button>
-          <span className="page-info">
-            {t.page} {currentPage} {t.of} {numPages || '?'}
-          </span>
-          <button 
-            onClick={() => changePage(1)} 
-            disabled={currentPage >= (numPages || 1)}
-            className="nav-btn"
-            title={t.nextPage}
-          >
-            →
-          </button>
+          <button onClick={() => changePage(-1)} disabled={currentPage <= 1} className="nav-btn" title={t.previousPage}>←</button>
+          <span className="page-info">{t.page} {currentPage} {t.of} {numPages || '?'}</span>
+          <button onClick={() => changePage(1)} disabled={currentPage >= (numPages || 1)} className="nav-btn" title={t.nextPage}>→</button>
         </div>
         
         <div className="zoom-controls">
-          <button onClick={() => changeScale(scale - 0.1)} className="zoom-btn" title={t.zoomOut}>
-            −
-          </button>
+          <button onClick={() => changeScale(scale - 0.1)} className="zoom-btn" title={t.zoomOut}>−</button>
           <span className="zoom-level">{Math.round(scale * 100)}%</span>
-          <button onClick={() => changeScale(scale + 0.1)} className="zoom-btn" title={t.zoomIn}>
-            +
-          </button>
+          <button onClick={() => changeScale(scale + 0.1)} className="zoom-btn" title={t.zoomIn}>+</button>
         </div>
         
-        <div className="reader-protection">
-          🔒 {t.protectedContent}
-        </div>
-      </div>
-      
-      {/* Security Notice */}
-      <div className="security-notice" style={{ display: 'none' }}>
-        This content is protected and monitored for piracy prevention.
+        <div className="reader-protection">🔒 {t.protectedContent}</div>
       </div>
     </div>
   );

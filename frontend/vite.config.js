@@ -31,7 +31,6 @@ export default defineConfig({
   },
 
   // ─── PDF.js Worker Configuration ───────────────────────────────────────────
-  // Required for react-pdf to work properly
   worker: {
     format: 'es',
   },
@@ -44,7 +43,15 @@ export default defineConfig({
     outDir: 'dist',
     sourcemap: false,
     chunkSizeWarningLimit: 1000,
+    commonjsOptions: {
+      include: [/react-pdf/, /pdfjs-dist/, /node_modules/],
+    },
     rollupOptions: {
+      // Treat these as external to avoid build issues
+      external: [
+        /react-pdf\/dist\/esm\/entry\.main\.min\.mjs/,
+        /react-pdf\/dist\/esm\/entry\.pdf\.js/,
+      ],
       output: {
         manualChunks(id) {
           if (id.includes('node_modules/swiper')) return 'vendor-swiper';
