@@ -58,8 +58,29 @@ function PDFViewer({ pdfUrl, currentPage, scale, onLoadSuccess, onPageChange, nu
 export default function Reader() {
   const { id } = useParams();
   const { language } = LanguageContext || { language: 'en' };
-  const { user } = useAuth || { user: null };
+  // Try to get user from AuthContext, fallback to localStorage
+  const authContext = useAuth ? useAuth() : null;
+  const authUser = authContext?.user;
+  
+  // Get user directly from localStorage to ensure persistence
+  const [user, setUser] = useState(null);
   const navigate = useNavigate();
+  
+  // Check localStorage for user data (like Library.jsx does)
+  useEffect(() => {
+    const storedUser = localStorage.getItem("auth_user");
+    const token = localStorage.getItem("access_token");
+    if (storedUser && token) {
+      try {
+        setUser(JSON.parse(storedUser));
+      } catch (e) {
+        // Invalid stored user
+      }
+    }
+  }, []);
+  
+  // Use either auth context user or localStorage user
+  const currentUser = user || authUser;
   
   const [book, setBook] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -76,8 +97,8 @@ export default function Reader() {
   const containerRef = useRef(null);
   const controlsTimeoutRef = useRef(null);
 
-  // Get user email for watermark
-  const userEmail = user?.email || user?.email_address || "reader@kavithedal.com";
+  // Get user email for watermark (use currentUser)
+  const userEmail = currentUser?.email || currentUser?.email_address || "reader@kavithedal.com";
   
   // Translation strings
   const translations = {
@@ -198,7 +219,7 @@ export default function Reader() {
   // Fetch book and verify access
   useEffect(() => {
     fetchBookAndAccess();
-  }, [id, user]);
+  }, [id, user, authUser]);
 
   // Save reading progress periodically
   useEffect(() => {
@@ -220,7 +241,8 @@ export default function Reader() {
   }, [currentPage, numPages, scale, book, id]);
 
   const fetchBookAndAccess = async () => {
-    if (!user) {
+    const currentUserCheck = user || authUser;
+    if (!currentUserCheck) {
       navigate("/login");
       return;
     }
