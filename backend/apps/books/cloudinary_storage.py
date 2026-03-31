@@ -30,30 +30,11 @@ try:
 
     class RawCloudinaryStorage(MediaCloudinaryStorage):
         """
-        Storage for PDF/file fields — uploads as Cloudinary 'raw' type.
-        
-        IMPORTANT: Files are uploaded as 'authenticated' type (not public).
-        This means direct URLs will NOT work without proper authentication.
-        
-        To access files, use the secure_ebook.py module to generate
-        time-limited signed URLs.
+        Storage for PDF/file fields — uploads as Cloudinary 'raw' type (public).
+        Access control is enforced at the Django API level (SecureFileView),
+        not at the Cloudinary storage level.
         """
         RESOURCE_TYPE = 'raw'
-        
-        def _get_upload_options(self, filename):
-            """
-            Override to set authenticated access for PDF files.
-            This prevents direct public access to ebook PDFs.
-            """
-            options = super()._get_upload_options(filename)
-            
-            # Set type to 'authenticated' to prevent public access
-            # User must have proper signed URL to access
-            if _cloudinary_configured:
-                options['type'] = 'authenticated'
-                options['access_mode'] = 'authenticated'
-            
-            return options
 
     class PrivatePDFStorage(MediaCloudinaryStorage):
         """

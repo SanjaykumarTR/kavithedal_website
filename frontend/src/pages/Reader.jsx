@@ -40,9 +40,6 @@ export default function Reader() {
     }
   }, []);
   
-  // Use either auth context user or localStorage user
-  const currentUser = user || authUser;
-  
   const [book, setBook] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -252,12 +249,17 @@ export default function Reader() {
               </a>
             </div>
             
-            <iframe
-              src={pdfUrl}
+            <object
+              data={pdfUrl}
+              type="application/pdf"
               className="pdf-viewer"
-              title={book?.title}
-              onError={() => setError("Failed to load PDF")}
-            />
+            >
+              <iframe
+                src={`https://docs.google.com/viewer?url=${encodeURIComponent(pdfUrl)}&embedded=true`}
+                className="pdf-viewer"
+                title={book?.title}
+              />
+            </object>
           </div>
         )}
       </div>

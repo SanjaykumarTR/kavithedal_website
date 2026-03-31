@@ -105,8 +105,6 @@ class SecureFileView(APIView):
     
     def get(self, request, book_id):
         from apps.orders.models import UserLibrary, EbookPurchase
-        from apps.books.secure_ebook import get_pdf_url_from_cloudinary, extract_public_id_from_cloudinary_url
-        
         logger = logging.getLogger('apps')
         
         # Check if user has purchased the book (via UserLibrary or EbookPurchase)
@@ -151,63 +149,28 @@ class SecureFileView(APIView):
                 status=status.HTTP_404_NOT_FOUND
             )
         
-        # Get the base URL from Cloudinary
+        # Get the Cloudinary URL directly from the storage field.
+        # Access control is already enforced above (auth + purchase check).
+        # Cloudinary URL signing with expires_at only works with the paid
+        # Auth Token feature; plain .url gives a working public raw URL.
         try:
             pdf_url = book.pdf_file.url
-            logger.info('PDF URL for book %s: %s', book_id, pdf_url)
-            
-            # Handle different Cloudinary URL types
-            if 'res.cloudinary.com' in pdf_url:
-                if '/image/upload/' in pdf_url and not pdf_url.endswith('.pdf'):
-                    # Image-type upload - append .pdf to get original file
-                    pdf_url = pdf_url + '.pdf'
-            
-            # Extract public ID from Cloudinary URL
-            public_id = extract_public_id_from_cloudinary_url(pdf_url)
-            
-            if public_id:
-                # Generate signed URL with 5-minute expiration
-                # Try signed URL first, fallback to unsigned
-                signed_result = get_pdf_url_from_cloudinary(public_id, use_signed=True, duration=300)
-                
-                if signed_result:
-                    pdf_url = signed_result.get('signed_url')
-                    is_fallback = signed_result.get('unsigned', False)
-                    
-                    if is_fallback:
-                        logger.warning(f"Using unsigned URL (Cloudinary signing not available) for book {book_id}")
-                    else:
-                        logger.info(f"Secure PDF URL generated for book {book_id}, user {request.user.id}")
-                    
-                    return Response({
-                        'pdf_url': pdf_url,
-                        'title': book.title,
-                        'expires_in': 300,
-                        'book_id': str(book.id),
-                        'is_admin_preview': is_admin and not has_purchased,
-                        'is_fallback': is_fallback,
-                    })
-                else:
-                    # Fallback if signing fails (still secure but less ideal)
-                    logger.warning(f"Could not generate signed URL, using fallback for book {book_id}")
-                    return Response({
-                        'pdf_url': pdf_url,
-                        'title': book.title,
-                        'expires_in': 300,
-                        'book_id': str(book.id),
-                        'is_admin_preview': is_admin and not has_purchased,
-                        'warning': 'Using unsigned URL - contact admin'
-                    })
-            else:
-                # Could not extract public ID, return as-is with limited access
-                logger.warning(f"Could not extract public ID from URL for book {book_id}")
-                return Response({
-                    'pdf_url': pdf_url,
-                    'title': book.title,
-                    'expires_in': 60,  # Shorter expiration
-                    'book_id': str(book.id),
-                })
-                
+            logger.info('PDF URL resolved for book %s, user %s: %s', book_id, request.user.id, pdf_url)
+
+            if not pdf_url or not pdf_url.startswith('http'):
+                logger.error('pdf_file.url returned a non-absolute URL for book %s: %r', book_id, pdf_url)
+                return Response(
+                    {'error': 'PDF file URL could not be resolved. Please re-upload the PDF.'},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+
+            return Response({
+                'pdf_url': pdf_url,
+                'title': book.title,
+                'book_id': str(book.id),
+                'is_admin_preview': is_admin and not has_purchased,
+            })
+
         except Exception as e:
             logger.error('Could not resolve PDF URL for book %s: %s', book_id, e)
             return Response(
