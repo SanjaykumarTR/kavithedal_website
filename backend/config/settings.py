@@ -355,6 +355,7 @@ DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024   # 10 MB
 # Get credentials from https://merchant.cashfree.com → Developers → API Keys
 CASHFREE_APP_ID = os.environ.get('CASHFREE_APP_ID', '')
 CASHFREE_SECRET_KEY = os.environ.get('CASHFREE_SECRET_KEY', '')
+CASHFREE_WEBHOOK_SECRET = os.environ.get('CASHFREE_WEBHOOK_SECRET', '')
 # 'sandbox' for testing, 'production' for live payments
 CASHFREE_ENV = os.environ.get('CASHFREE_ENV', 'sandbox')
 

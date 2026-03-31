@@ -78,6 +78,9 @@ services:
       - key: CASHFREE_SECRET_KEY
         sync: false       # Set in Render dashboard
 
+      - key: CASHFREE_WEBHOOK_SECRET
+        sync: false      # Set in Render dashboard - from Developers → Webhooks
+
       # 'sandbox' for testing, 'production' for live payments
       - key: CASHFREE_ENV
         value: "production"

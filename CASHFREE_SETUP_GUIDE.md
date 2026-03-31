@@ -91,8 +91,8 @@ The Kavithedal Publications project already has a complete Cashfree payment inte
      - **Events**: 
        - `PAYMENT_SUCCESS_WEBHOOK`
        - `PAYMENT_FAILED_WEBHOOK`
-   - Copy the Webhook Secret Key
-   - Add to Render: `CASHFREE_WEBHOOK_SECRET` (if using custom verification)
+   - After creating the webhook, you'll see a **Webhook Secret Key**
+   - Add to Render: `CASHFREE_WEBHOOK_SECRET` = (the secret key from Cashfree dashboard)
 
 4. **App Configuration**:
    - Ensure your Cashfree account is activated for production
@@ -167,8 +167,9 @@ The Kavithedal Publications project already has a complete Cashfree payment inte
 ### Backend (Render):
 | Variable | Value |
 |----------|-------|
-| CASHFREE_APP_ID | (from Cashfree dashboard) |
-| CASHFREE_SECRET_KEY | (from Cashfree dashboard) |
+| CASHFREE_APP_ID | (from Cashfree dashboard → Developers → API Keys) |
+| CASHFREE_SECRET_KEY | (from Cashfree dashboard → Developers → API Keys) |
+| CASHFREE_WEBHOOK_SECRET | (from Cashfree dashboard → Developers → Webhooks) |
 | CASHFREE_ENV | `production` or `sandbox` |
 | FRONTEND_URL | `https://www.kavithedalpublication.store` |
 | CORS_ALLOWED_ORIGINS | `https://www.kavithedalpublication.store,https://kavithedalpublication.store,https://kavithedal-frontend-sgki.onrender.com` |
