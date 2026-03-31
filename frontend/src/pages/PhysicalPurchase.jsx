@@ -151,9 +151,7 @@ export default function PhysicalPurchase() {
     setError("");
 
     try {
-      const data = await createOrder("physical", {
-        book_id: id,
-        order_type: "physical",
+      const data = await createOrder(id, "physical", {
         full_name: formData.user_name,
         email: formData.email,
         phone: formData.phone,
