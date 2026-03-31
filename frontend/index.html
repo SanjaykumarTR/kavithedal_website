@@ -21,19 +21,21 @@
 
     <!-- Cashfree JS SDK — loaded deferred, only needed when user initiates payment -->
     <script src="https://sdk.cashfree.com/js/v3/cashfree.js" defer></script>
-  </head>
-  <body>
-    <div id="root"></div>
-    <!-- SPA redirect restore: 404.html stores the path here so React Router can navigate to it -->
+
+    <!-- SPA redirect restore -->
     <script>
-      (function () {
+      (function() {
         var redirect = sessionStorage.getItem('spa_redirect');
         if (redirect && redirect !== '/') {
           sessionStorage.removeItem('spa_redirect');
+          // Use replaceState to avoid cluttering browser history
           window.history.replaceState(null, '', redirect);
         }
       })();
     </script>
+  </head>
+  <body>
+    <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

@@ -71,6 +71,26 @@ export default function PurchaseSuccess() {
   const t = translations[language];
 
   useEffect(() => {
+    // Check for SPA redirect (from 404.html handling)
+    const storedRedirect = sessionStorage.getItem('spa_redirect');
+    if (storedRedirect && !orderId) {
+      // Parse the stored redirect URL to get order_id
+      try {
+        const url = new URL(storedRedirect, window.location.origin);
+        const redirectOrderId = url.searchParams.get('order_id');
+        const redirectType = url.searchParams.get('type');
+        const redirectBook = url.searchParams.get('book');
+        
+        if (redirectOrderId) {
+          // Update state from stored redirect
+          console.log('Restored redirect from sessionStorage:', storedRedirect);
+        }
+      } catch (e) {
+        console.error('Failed to parse stored redirect:', e);
+      }
+      sessionStorage.removeItem('spa_redirect');
+    }
+    
     if (!orderId) {
       setErrorMsg("No order ID found in URL.");
       setVerifying(false);
@@ -176,6 +196,17 @@ export default function PurchaseSuccess() {
     ? t.cartMsg
     : t.physicalMsg;
 
+  // Auto-redirect to library after successful payment
+  useEffect(() => {
+    if (verified && isEbook) {
+      // Show success message for 2 seconds, then redirect
+      const timer = setTimeout(() => {
+        navigate("/library");
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [verified, isEbook, navigate]);
+
   return (
     <div className="purchase-success-page">
       <div className="success-container">
@@ -198,16 +229,27 @@ export default function PurchaseSuccess() {
 
         <p className="thank-you">{t.thankYou}</p>
 
+        {/* Auto-redirect message for ebooks */}
+        {verified && isEbook && (
+          <p style={{ color: '#666', marginTop: '1rem', fontSize: '0.9rem' }}>
+            Redirecting to your library...
+          </p>
+        )}
+
         <div className="success-actions">
-          {isEbook ? (
-            <Link to="/library" className="btn-success">
+          {verified && isEbook ? (
+            // Auto-redirecting - button as backup
+            <button
+              className="btn-success"
+              onClick={() => navigate("/library")}
+            >
               {t.goToLibrary}
-            </Link>
-          ) : (
+            </button>
+          ) : verified ? (
             <Link to="/user-dashboard" className="btn-success">
               {t.goToOrders}
             </Link>
-          )}
+          ) : null}
           <Link to="/" className="btn-secondary">
             {t.backToHome}
           </Link>
