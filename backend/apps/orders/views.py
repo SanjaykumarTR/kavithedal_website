@@ -45,10 +45,16 @@ def _cashfree_configured():
 
 
 def _cf_base_url():
-    """Get the base URL for Cashfree API - uses CASHFREE_BASE_URL env var if set."""
+    """Get the base URL for Cashfree API - uses CASHFREE_BASE_URL env var if set.
+    
+    Returns base like https://api.cashfree.com/pg (without /orders)
+    """
     # If explicitly set, use that URL
     base_url = getattr(settings, 'CASHFREE_BASE_URL', '')
     if base_url:
+        # Remove /orders if present to get base
+        if base_url.endswith('/orders'):
+            return base_url[:-7]  # Remove '/orders'
         return base_url.rstrip('/')
     
     # Otherwise fall back to environment-based selection
