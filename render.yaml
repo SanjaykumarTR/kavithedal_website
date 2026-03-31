@@ -127,7 +127,7 @@ services:
         name: Cache-Control
         value: "public, max-age=31536000, immutable"  # Hashed assets cached 1 year
     envVars:
-      # Pre-filled with the default Render URL for kavithedal-api.
+      # Pre-filled with the default Render URL for kavithedal-web.
       # Vite bakes this into the build — update if you rename the service or use a custom domain.
       - key: VITE_API_URL
         value: "https://kavithedal-web.onrender.com"
