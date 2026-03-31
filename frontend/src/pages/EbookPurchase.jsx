@@ -122,6 +122,9 @@ export default function EbookPurchase() {
         address: formData.address,
       });
 
+      // Debug: Log the response
+      console.log('EbookPurchase response:', data);
+
       // Simulation mode (no Cashfree keys configured on backend)
       if (data.status === "completed") {
         navigate(
@@ -132,13 +135,17 @@ export default function EbookPurchase() {
 
       // Production mode — redirect to Cashfree payment page
       if (data.payment_session_id) {
+        console.log('Initiating Cashfree checkout with session:', data.payment_session_id);
         initiateCashfreeCheckout(data.payment_session_id);
         // ↑ This triggers a full-page redirect — no code runs after this
         return;
       }
 
-      setError("Unexpected response from server. Please try again.");
+      // If no payment_session_id and no status=completed, show error
+      console.error('Missing payment_session_id in response:', data);
+      setError("Payment gateway error. Please contact support.");
     } catch (err) {
+      console.error('EbookPurchase error:', err);
       const msg =
         err.response?.data?.error ||
         err.response?.data?.detail ||

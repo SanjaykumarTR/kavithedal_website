@@ -107,10 +107,11 @@ def _cf_create_order(cf_order_id, amount, customer_id, customer_email,
     if note:
         payload['order_note'] = str(note)[:50]
 
-    # Debug: Log the request
+    # Debug: Log the full request
     logger.info(f'Cashfree create order request: order_id={cf_order_id}, amount={amount}')
     logger.info(f'Cashfree base URL: {_cf_base_url()}')
     logger.info(f'Cashfree app_id: {getattr(settings, "CASHFREE_APP_ID", "NOT SET")[:10]}...')
+    logger.info(f'Cashfree request payload: {json.dumps(payload)}')
 
     try:
         resp = http_requests.post(
@@ -120,15 +121,27 @@ def _cf_create_order(cf_order_id, amount, customer_id, customer_email,
             timeout=30,
         )
         logger.info(f'Cashfree response status: {resp.status_code}')
+        logger.info(f'Cashfree response body: {resp.text}')
         
         if resp.status_code >= 400:
             logger.error(f'Cashfree API error response: {resp.text}')
             resp.raise_for_status()
         
-        return resp.json()
+        cf_response = resp.json()
+        logger.info(f'Cashfree parsed response: {cf_response}')
+        
+        # Check if payment_session_id exists in response
+        if 'payment_session_id' not in cf_response:
+            logger.error(f'Cashfree response missing payment_session_id. Full response: {cf_response}')
+            raise ValueError(f"Cashfree response missing payment_session_id. Response: {cf_response}")
+        
+        return cf_response
     except http_requests.exceptions.HTTPError as exc:
         logger.error(f'Cashfree HTTP error: {exc}')
         logger.error(f'Response body: {exc.response.text if exc.response else "No response"}')
+        raise
+    except ValueError:
+        # Re-raise ValueError for missing payment_session_id
         raise
     except Exception as exc:
         logger.error(f'Cashfree request failed: {exc}')
@@ -534,6 +547,13 @@ class CreateOrderView(APIView):
                 return_url=return_url,
                 note=book.title,
             )
+        except ValueError as exc:
+            logger.error(f'Cashfree order created but missing payment_session_id: {exc}')
+            order.delete()
+            return Response(
+                {'error': 'Payment gateway configuration error. Please contact support.'},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
         except Exception as exc:
             logger.error('Cashfree create order failed for order %s: %s', order.id, exc)
             order.delete()
@@ -541,6 +561,9 @@ class CreateOrderView(APIView):
                 {'error': 'Payment gateway error. Please try again.'},
                 status=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
+
+        logger.info(f'Order created successfully: order_id={order.id}, cf_order_id={cf_order_id}')
+        logger.info(f'Cashfree response payment_session_id: {cf_data.get("payment_session_id", "NOT FOUND")[:50]}...')
 
         # Store Cashfree order ID on the Order record for later lookup
         order.razorpay_order_id = cf_order_id
@@ -640,6 +663,14 @@ class EbookPurchaseView(APIView):
                 return_url=return_url,
                 note=book.title,
             )
+        except ValueError as exc:
+            # Missing payment_session_id - log and return error
+            logger.error(f'Cashfree order created but missing payment_session_id: {exc}')
+            purchase.delete()
+            return Response(
+                {'error': 'Payment gateway configuration error. Please contact support.'},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
         except Exception as exc:
             logger.error('Cashfree ebook order creation failed for purchase %s: %s', purchase.id, exc)
             purchase.delete()
@@ -647,6 +678,9 @@ class EbookPurchaseView(APIView):
                 {'error': 'Payment gateway error. Please try again.'},
                 status=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
+
+        logger.info(f'Ebook purchase order created successfully: purchase_id={purchase.id}, cf_order_id={cf_order_id}')
+        logger.info(f'Cashfree response payment_session_id: {cf_data.get("payment_session_id", "NOT FOUND")[:50]}...')
 
         purchase.razorpay_order_id = cf_order_id
         purchase.save(update_fields=['razorpay_order_id'])
@@ -711,6 +745,13 @@ class CartCheckoutView(APIView):
                 return_url=return_url,
                 note=f'{len(items)} book(s)',
             )
+        except ValueError as exc:
+            CartCheckoutSession.objects.filter(id=session_uuid).delete()
+            logger.error(f'Cashfree cart order created but missing payment_session_id: {exc}')
+            return Response(
+                {'error': 'Payment gateway configuration error. Please contact support.'},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
         except Exception as exc:
             CartCheckoutSession.objects.filter(id=session_uuid).delete()
             logger.error('Cashfree cart order creation failed: %s', exc)
@@ -718,6 +759,9 @@ class CartCheckoutView(APIView):
                 {'error': 'Payment gateway error. Please try again.'},
                 status=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
+
+        logger.info(f'Cart checkout created: session={session_uuid}, cf_order_id={cf_order_id}')
+        logger.info(f'Cashfree response payment_session_id: {cf_data.get("payment_session_id", "NOT FOUND")[:50]}...')
 
         return Response({
             'payment_session_id': cf_data.get('payment_session_id', ''),
