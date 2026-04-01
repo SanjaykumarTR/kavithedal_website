@@ -151,18 +151,61 @@ WSGI_APPLICATION = 'config.wsgi.application'
 
 
 # ─── Database ─────────────────────────────────────────────────────────────────
-# Uses DATABASE_URL env var when set (Render PostgreSQL / any 12-factor DB).
+# Uses DATABASE_URL env var when set (Render PostgreSQL / Supabase PostgreSQL).
 # Falls back to local SQLite for development when DATABASE_URL is not set.
-_DATABASE_URL = os.environ.get('DATABASE_URL')
+# IMPORTANT: For Supabase, use the Connection Pooler URL (not direct DB URL)
+# and ensure sslmode=require is set in OPTIONS.
+_DATABASE_URL = os.environ.get('DATABASE_URL', '')
 
 if _DATABASE_URL:
-    DATABASES = {
-        'default': dj_database_url.parse(
-            _DATABASE_URL,
-            conn_max_age=600,
-            conn_health_checks=True,
-        )
-    }
+    # Check if this is a Supabase connection (detected by .supabase.co domain)
+    if '.supabase.co' in _DATABASE_URL:
+        # Supabase requires special handling
+        # Parse the URL to ensure correct pooler port (6543) is used
+        import urllib.parse
+        parsed = urllib.parse.urlparse(_DATABASE_URL)
+        
+        # If using direct DB port (5432), switch to pooler port (6543)
+        if parsed.port == 5432:
+            # Reconstruct URL with pooler port
+            netloc = parsed.hostname
+            if parsed.username:
+                netloc = f"{urllib.parse.quote(parsed.username)}:{urllib.parse.quote(parsed.password)}@{parsed.hostname}:6543"
+            new_path = parsed.path if parsed.path else '/postgres'
+            _DATABASE_URL = f"{parsed.scheme}://{netloc}{new_path}"
+            if parsed.query:
+                _DATABASE_URL += f"?{parsed.query}"
+        
+        DATABASES = {
+            'default': dj_database_url.parse(
+                _DATABASE_URL,
+                conn_max_age=600,
+                conn_health_checks=True,
+            )
+        }
+        # Supabase connection pooler requires SSL
+        DATABASES['default']['OPTIONS'] = {
+            'sslmode': 'require',
+            'sslrootcert': os.environ.get('SSLROOTCERT', ''),
+        }
+    else:
+        # Standard PostgreSQL (Render or other providers)
+        DATABASES = {
+            'default': dj_database_url.parse(
+                _DATABASE_URL,
+                conn_max_age=600,
+                conn_health_checks=True,
+            )
+        }
+        # Add SSL for production PostgreSQL
+        DATABASES['default']['OPTIONS'] = {
+            'sslmode': 'require',
+            'sslrootcert': os.environ.get('SSLROOTCERT', ''),
+        }
+    
+    # Remove empty sslrootcert if not provided
+    if not DATABASES['default']['OPTIONS']['sslrootcert']:
+        del DATABASES['default']['OPTIONS']['sslrootcert']
 else:
     DATABASES = {
         'default': {
