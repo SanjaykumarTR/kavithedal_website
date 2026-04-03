@@ -210,9 +210,8 @@ export default function Home() {
         <div className="parallax-shape parallax-shape-2"></div>
       </div>
 
-      {/* ImageSlider and PromoSection render immediately — never block on books API */}
+      {/* ImageSlider renders immediately — never block on books API */}
       <ImageSlider />
-      <PromoSection />
 
       {/* ================= BOOKS SECTIONS ================= */}
       {loading ? (
@@ -375,6 +374,8 @@ export default function Home() {
 
         </>
       )} {/* end books loading/empty/content block */}
+
+      <PromoSection />
 
       {/* ================= TESTIMONIALS SECTION ================= */}
       {testimonials.length > 0 && (
