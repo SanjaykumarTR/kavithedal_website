@@ -34,7 +34,7 @@ export default function Footer() {
           <h4>{language === "en" ? "Contact" : "தொடர்பு"}</h4>
           <p>kavithedaldpi@gmail.com</p>
           <p>+91 7904730223</p>
-          <p>Odasalpatti X Road Harur - Dharmapuri Highway, Dharmapuri, Tamil Nadu, India</p>
+          <p>Odasalpatti X Road Harur - Dharmapuri Highway, Dharmapuri-635 303, Tamil Nadu, India</p>
         </div>
       </div>
 
