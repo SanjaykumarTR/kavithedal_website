@@ -1,0 +1,177 @@
+"""
+Serializers for Accounts App.
+"""
+from rest_framework import serializers
+from django.contrib.auth import authenticate
+from .models import AdminUser, AdminOTP
+
+
+class AdminUserSerializer(serializers.ModelSerializer):
+    """
+    Serializer for Admin User model.
+    """
+    class Meta:
+        model = AdminUser
+        fields = [
+            'id', 'email', 'username', 'first_name', 'last_name',
+            'role', 'phone', 'profile_image', 'is_active',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at']
+
+
+class AdminUserCreateSerializer(serializers.ModelSerializer):
+    """
+    Serializer for creating Admin User.
+    """
+    password = serializers.CharField(write_only=True, min_length=8)
+    confirm_password = serializers.CharField(write_only=True)
+    
+    class Meta:
+        model = AdminUser
+        fields = [
+            'email', 'username', 'password', 'confirm_password',
+            'first_name', 'last_name', 'role', 'phone'
+        ]
+    
+    def validate(self, data):
+        if data['password'] != data['confirm_password']:
+            raise serializers.ValidationError("Passwords do not match")
+        return data
+    
+    def create(self, validated_data):
+        validated_data.pop('confirm_password')
+        password = validated_data.pop('password')
+        
+        user = AdminUser.objects.create_user(
+            password=password,
+            **validated_data
+        )
+        return user
+
+
+class RegisterSerializer(serializers.ModelSerializer):
+    """
+    Serializer for user registration.
+    Username is auto-generated from email — clients do not need to send it.
+    """
+    password = serializers.CharField(write_only=True, min_length=8)
+    confirm_password = serializers.CharField(write_only=True)
+    # username is accepted but optional — we sanitize/auto-generate server-side
+    username = serializers.CharField(required=False, allow_blank=True, default='')
+
+    class Meta:
+        model = AdminUser
+        fields = ['email', 'username', 'password', 'confirm_password']
+
+    def validate_email(self, value):
+        if AdminUser.objects.filter(email__iexact=value).exists():
+            raise serializers.ValidationError("An account with this email already exists.")
+        return value.lower()
+
+    def validate(self, data):
+        if data['password'] != data['confirm_password']:
+            raise serializers.ValidationError("Passwords do not match.")
+        return data
+
+    @staticmethod
+    def _make_unique_username(base):
+        """Derive a unique username from a base string."""
+        import re
+        # Keep only word chars, dots, @, +, -, underscores (Django allows these)
+        clean = re.sub(r'[^\w.@+\-]', '_', base).strip('_') or 'user'
+        clean = clean[:140]  # Leave room for numeric suffix
+        candidate = clean
+        counter = 1
+        while AdminUser.objects.filter(username=candidate).exists():
+            candidate = f"{clean}{counter}"
+            counter += 1
+        return candidate
+
+    def create(self, validated_data):
+        validated_data.pop('confirm_password')
+        raw_username = validated_data.pop('username', '') or ''
+        # Prefer the supplied username; fall back to email prefix
+        base = raw_username.strip() or validated_data['email'].split('@')[0]
+        username = self._make_unique_username(base)
+        user = AdminUser.objects.create_user(
+            username=username,
+            email=validated_data['email'],
+            password=validated_data['password'],
+            role='user',
+        )
+        return user
+
+
+class LoginSerializer(serializers.Serializer):
+    """
+    Serializer for user login.
+    """
+    email = serializers.EmailField()
+    password = serializers.CharField(write_only=True)
+    
+    def validate(self, data):
+        email = data.get('email')
+        password = data.get('password')
+        
+        if email and password:
+            # Try to find user by email
+            try:
+                user = AdminUser.objects.get(email=email)
+            except AdminUser.DoesNotExist:
+                raise serializers.ValidationError("Invalid email or password")
+            
+            # Check password
+            if not user.check_password(password):
+                raise serializers.ValidationError("Invalid email or password")
+            
+            if not user.is_active:
+                raise serializers.ValidationError("User account is disabled")
+            
+            data['user'] = user
+        else:
+            raise serializers.ValidationError("Must include 'email' and 'password'")
+        
+        return data
+
+
+class PasswordChangeSerializer(serializers.Serializer):
+    """
+    Serializer for password change.
+    """
+    old_password = serializers.CharField(write_only=True)
+    new_password = serializers.CharField(write_only=True, min_length=8)
+    confirm_password = serializers.CharField(write_only=True)
+    
+    def validate(self, data):
+        if data['new_password'] != data['confirm_password']:
+            raise serializers.ValidationError("New passwords do not match")
+        return data
+
+
+class AdminOTPSerializer(serializers.ModelSerializer):
+    """
+    Serializer for AdminOTP model.
+    """
+    class Meta:
+        model = AdminOTP
+        fields = ['id', 'user', 'otp_code', 'is_used', 'expires_at', 'created_at']
+        read_only_fields = ['id', 'user', 'otp_code', 'expires_at', 'created_at']
+
+
+class OTPVerifySerializer(serializers.Serializer):
+    """
+    Serializer for verifying OTP.
+    """
+    email = serializers.EmailField()
+    otp_code = serializers.CharField(max_length=6, min_length=6)
+
+
+class ProfileUpdateSerializer(serializers.ModelSerializer):
+    """
+    Serializer for updating own profile (first_name, last_name, phone).
+    Email and role changes are not allowed through this endpoint.
+    """
+    class Meta:
+        model = AdminUser
+        fields = ['first_name', 'last_name', 'phone', 'profile_image']

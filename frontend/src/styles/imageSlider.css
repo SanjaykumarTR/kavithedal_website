@@ -1,0 +1,222 @@
+/* ===============================
+   MODERN IMAGE SLIDER - 3D EFFECTS
+================================= */
+
+/* Main Container */
+.slider-container {
+  width: 100%;
+  height: 500px;
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+}
+
+/* Modern Slider */
+.modern-slider {
+  width: 100%;
+  height: 100%;
+  padding: 20px 0;
+}
+
+.modern-slider .swiper-slide {
+  width: 75%;
+  height: 90%;
+  transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  transform: scale(0.9);
+}
+
+.modern-slider .swiper-slide-active {
+  transform: scale(1);
+  z-index: 10;
+}
+
+/* Slide Content */
+.slider-slide {
+  position: relative;
+  border-radius: 24px;
+  overflow: hidden;
+  box-shadow: 
+    0 25px 50px rgba(0, 0, 0, 0.4),
+    0 0 0 1px rgba(255, 255, 255, 0.1);
+  transform-style: preserve-3d;
+}
+
+.slide-content {
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+.slide-content img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: all 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.modern-slider .swiper-slide-active .slide-content img {
+  transform: scale(1.1);
+}
+
+/* Slide Overlay - Glassmorphism */
+.slide-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to top,
+    rgba(0, 0, 0, 0.8) 0%,
+    rgba(0, 0, 0, 0.3) 40%,
+    rgba(0, 0, 0, 0.1) 100%
+  );
+  display: flex;
+  align-items: flex-end;
+  padding: 40px;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+}
+
+.modern-slider .swiper-slide-active .slide-overlay {
+  opacity: 1;
+}
+
+/* Slide Text */
+.slide-text {
+  transform: translateY(30px);
+  transition: transform 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.modern-slider .swiper-slide-active .slide-text {
+  transform: translateY(0);
+}
+
+.slide-badge {
+  display: inline-block;
+  padding: 8px 20px;
+  background: linear-gradient(135deg, #B71C1C 0%, #D32F2F 100%);
+  color: white;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 20px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 15px;
+  box-shadow: 0 4px 15px rgba(183, 28, 28, 0.4);
+}
+
+.slide-text h2 {
+  font-size: 42px;
+  font-weight: 700;
+  color: white;
+  margin-bottom: 12px;
+  text-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  line-height: 1.2;
+}
+
+.slide-text p {
+  font-size: 18px;
+  color: rgba(255, 255, 255, 0.85);
+  max-width: 500px;
+}
+
+/* Swiper Navigation Override */
+.modern-slider .swiper-button-next,
+.modern-slider .swiper-button-prev {
+  width: 50px;
+  height: 50px;
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  color: white;
+}
+
+.modern-slider .swiper-button-next {
+  right: 30px;
+}
+
+.modern-slider .swiper-button-prev {
+  left: 30px;
+}
+
+.modern-slider .swiper-button-next:hover,
+.modern-slider .swiper-button-prev:hover {
+  background: linear-gradient(135deg, #B71C1C 0%, #D32F2F 100%);
+  border-color: #B71C1C;
+}
+
+.modern-slider .swiper-button-next::after,
+.modern-slider .swiper-button-prev::after {
+  font-size: 20px;
+  font-weight: bold;
+}
+
+/* Swiper Pagination Override */
+.modern-slider .swiper-pagination-bullet {
+  width: 12px;
+  height: 12px;
+  background: rgba(255, 255, 255, 0.4);
+  border: none;
+  opacity: 1;
+  transition: all 0.3s ease;
+}
+
+.modern-slider .swiper-pagination-bullet-active {
+  background: white;
+  width: 30px;
+  border-radius: 10px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+}
+
+/* ===============================
+   RESPONSIVE
+================================= */
+@media (max-width: 992px) {
+  .slider-container {
+    height: 400px;
+  }
+
+  .slide-text h2 {
+    font-size: 32px;
+  }
+
+  .slide-text p {
+    font-size: 16px;
+  }
+
+  .modern-slider .swiper-button-next,
+  .modern-slider .swiper-button-prev {
+    width: 40px;
+    height: 40px;
+  }
+
+  .modern-slider .swiper-button-next {
+    right: 15px;
+  }
+
+  .modern-slider .swiper-button-prev {
+    left: 15px;
+  }
+}
+
+@media (max-width: 576px) {
+  .slider-container {
+    height: 350px;
+  }
+
+  .modern-slider .swiper-slide {
+    width: 90%;
+  }
+
+  .slide-text h2 {
+    font-size: 24px;
+  }
+
+  .slide-overlay {
+    padding: 25px;
+  }
+
+  .slide-badge {
+    font-size: 10px;
+    padding: 6px 14px;
+  }
+}

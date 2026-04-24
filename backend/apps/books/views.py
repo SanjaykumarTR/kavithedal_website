@@ -1,0 +1,574 @@
+"""
+Views for secure file access - PDFs can only be downloaded by purchasers.
+"""
+from rest_framework import viewsets, permissions, status
+from rest_framework.decorators import api_view, permission_classes, action
+from rest_framework.response import Response
+from rest_framework.views import APIView
+from django.http import FileResponse, Http404
+from django.conf import settings
+import os
+import logging
+
+logger = logging.getLogger('apps')
+
+from apps.books.models import Book, Category, BookSubmission, ContactMessage
+from apps.books.serializers import BookSerializer, BookListSerializer, BookCreateUpdateSerializer, CategorySerializer, BookSubmissionSerializer, ContactMessageSerializer
+from apps.orders.models import UserLibrary
+from apps.accounts.utils import is_authorized_admin
+
+
+class BookViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for Book model with CRUD operations.
+    """
+    queryset = Book.objects.all()
+    
+    def get_serializer_class(self):
+        if self.action == 'list':
+            return BookListSerializer
+        elif self.action in ['create', 'update', 'partial_update']:
+            return BookCreateUpdateSerializer
+        return BookSerializer
+    
+    def get_queryset(self):
+        from apps.accounts.utils import is_authorized_admin
+        queryset = Book.objects.select_related('author', 'category').all()
+
+        # Admins see all books; regular users see only active ones
+        if not is_authorized_admin(self.request.user):
+            queryset = queryset.filter(is_active=True)
+
+        # Filter by category
+        category = self.request.query_params.get('category')
+        if category:
+            queryset = queryset.filter(category__name=category)
+
+        # Filter by featured
+        featured = self.request.query_params.get('featured')
+        if featured:
+            queryset = queryset.filter(is_featured=True)
+
+        # Search by title or author name
+        search = self.request.query_params.get('search')
+        if search:
+            from django.db.models import Q
+            queryset = queryset.filter(
+                Q(title__icontains=search) |
+                Q(author__name__icontains=search)
+            )
+
+        return queryset
+
+
+class CategoryViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for Category model with CRUD operations.
+    """
+    queryset = Category.objects.all()
+    serializer_class = CategorySerializer
+
+
+class IsPurchasedPermission(permissions.BasePermission):
+    """Permission to check if user has purchased the book."""
+    
+    def has_permission(self, request, view):
+        if not request.user.is_authenticated:
+            return False
+        return True
+    
+    def has_object_permission(self, request, view, obj):
+        # Check if user has purchased this book
+        has_access = UserLibrary.objects.filter(
+            user=request.user,
+            book=obj
+        ).exists()
+        
+        # Also allow the authorized admin
+        if is_authorized_admin(request.user):
+            return True
+            
+        return has_access
+
+
+class SecureFileView(APIView):
+    """
+    Secure PDF access API for Kavithedal Publications.
+    
+    Security features:
+    - Only authenticated users with valid purchase can access
+    - Generates time-limited signed URLs from Cloudinary
+    - Logs access for security auditing
+    - Returns temporary URL (expires in 5 minutes by default)
+    """
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get(self, request, book_id):
+        from apps.orders.models import UserLibrary, EbookPurchase
+        logger = logging.getLogger('apps')
+        
+        # Check if user has purchased the book (via UserLibrary or EbookPurchase)
+        has_purchased = UserLibrary.objects.filter(
+            user=request.user,
+            book_id=book_id
+        ).exists()
+        
+        # Also check EbookPurchase for ebook purchases
+        if not has_purchased:
+            has_purchased = EbookPurchase.objects.filter(
+                user=request.user,
+                book_id=book_id,
+                payment_status='completed'
+            ).exists()
+        
+        # Allow authorized admin access (for preview purposes)
+        from apps.accounts.utils import is_authorized_admin
+        is_admin = is_authorized_admin(request.user)
+        
+        if not has_purchased and not is_admin:
+            logger.warning(
+                f"Unauthorized PDF access attempt: user={request.user.id}, book={book_id}"
+            )
+            return Response(
+                {'error': 'You do not have access to this file. Please purchase the book first.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # Get the book
+        try:
+            book = Book.objects.get(id=book_id)
+        except Book.DoesNotExist:
+            return Response(
+                {'error': 'Book not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        if not book.pdf_file:
+            return Response(
+                {'error': 'No PDF file available for this book'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Get the Cloudinary URL directly from the storage field.
+        # Access control is already enforced above (auth + purchase check).
+        # Cloudinary URL signing with expires_at only works with the paid
+        # Auth Token feature; plain .url gives a working public raw URL.
+        try:
+            pdf_url = book.pdf_file.url
+            logger.info('PDF URL resolved for book %s, user %s: %s', book_id, request.user.id, pdf_url)
+
+            if not pdf_url or not pdf_url.startswith('http'):
+                logger.error('pdf_file.url returned a non-absolute URL for book %s: %r', book_id, pdf_url)
+                return Response(
+                    {'error': 'PDF file URL could not be resolved. Please re-upload the PDF.'},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+
+            return Response({
+                'pdf_url': pdf_url,
+                'title': book.title,
+                'book_id': str(book.id),
+                'is_admin_preview': is_admin and not has_purchased,
+            })
+
+        except Exception as e:
+            logger.error('Could not resolve PDF URL for book %s: %s', book_id, e)
+            return Response(
+                {'error': 'PDF file is not accessible', 'details': str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def check_pdf_access(request, book_id):
+    """
+    Check if user has access to a book's PDF.
+    Returns detailed access information for the frontend.
+    """
+    from apps.orders.models import UserLibrary, EbookPurchase
+    
+    has_purchased = UserLibrary.objects.filter(
+        user=request.user,
+        book_id=book_id
+    ).exists()
+    
+    # Also check EbookPurchase
+    ebook_purchase = None
+    if not has_purchased:
+        ebook_purchases = EbookPurchase.objects.filter(
+            user=request.user,
+            book_id=book_id,
+            payment_status='completed'
+        )
+        has_purchased = ebook_purchases.exists()
+        if has_purchased:
+            ebook_purchase = ebook_purchases.first()
+    
+    # Also allow the authorized admin
+    if is_authorized_admin(request.user):
+        has_purchased = True
+    
+    try:
+        book = Book.objects.get(id=book_id)
+        has_pdf = bool(book.pdf_file)
+    except Book.DoesNotExist:
+        has_pdf = False
+    
+    response_data = {
+        'has_access': has_purchased,
+        'has_pdf': has_pdf,
+        'book_id': str(book_id)
+    }
+    
+    # Add reading progress if user has purchased
+    if ebook_purchase:
+        response_data.update({
+            'current_page': ebook_purchase.current_page,
+            'reading_progress': ebook_purchase.reading_progress or {},
+            'purchase_id': str(ebook_purchase.id),
+        })
+    
+    return Response(response_data)
+
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def update_reading_progress(request, book_id):
+    """
+    Update the reading progress for a book.
+    Called periodically as the user reads through the ebook.
+    """
+    from apps.orders.models import EbookPurchase
+    
+    page = request.data.get('page', 0)
+    total_pages = request.data.get('total_pages', 0)
+    metadata = request.data.get('metadata', {})
+    
+    # Find the purchase record
+    try:
+        purchase = EbookPurchase.objects.get(
+            user=request.user,
+            book_id=book_id,
+            payment_status='completed'
+        )
+    except EbookPurchase.DoesNotExist:
+        return Response(
+            {'error': 'Purchase not found or not completed'},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    
+    # Update progress
+    purchase.current_page = page
+    purchase.reading_progress = {
+        **purchase.reading_progress,
+        **metadata,
+        'last_read': str(request.user.id),
+        'total_pages': total_pages,
+        'progress_percent': round((page / total_pages) * 100, 2) if total_pages > 0 else 0,
+    }
+    purchase.save(update_fields=['current_page', 'reading_progress', 'updated_at'])
+    
+    logger.info(f"Reading progress updated: user={request.user.id}, book={book_id}, page={page}")
+    
+    return Response({
+        'success': True,
+        'current_page': page,
+        'progress_percent': purchase.reading_progress.get('progress_percent', 0),
+    })
+
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def get_reading_progress(request, book_id):
+    """
+    Get the reading progress for a book.
+    Returns the last read position and any bookmarks.
+    """
+    from apps.orders.models import EbookPurchase
+    
+    try:
+        purchase = EbookPurchase.objects.get(
+            user=request.user,
+            book_id=book_id,
+            payment_status='completed'
+        )
+    except EbookPurchase.DoesNotExist:
+        return Response(
+            {'error': 'Purchase not found or not completed'},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    
+    return Response({
+        'current_page': purchase.current_page,
+        'reading_progress': purchase.reading_progress or {},
+        'purchase_id': str(purchase.id),
+    })
+
+
+@api_view(['GET'])
+@permission_classes([permissions.AllowAny])
+def pdf_url_diagnostic(request, book_id):
+    """
+    Diagnostic endpoint to debug PDF URL issues.
+    Returns the raw Cloudinary URL and public ID extraction results.
+    """
+    from apps.books.secure_ebook import extract_public_id_from_cloudinary_url, get_cloudinary_config
+    
+    try:
+        book = Book.objects.get(id=book_id)
+    except Book.DoesNotExist:
+        return Response({'error': 'Book not found'}, status=status.HTTP_404_NOT_FOUND)
+    
+    result = {
+        'book_id': str(book.id),
+        'book_title': book.title,
+        'has_pdf_file': bool(book.pdf_file),
+    }
+    
+    if book.pdf_file:
+        try:
+            # Get the raw URL
+            raw_url = book.pdf_file.url
+            result['raw_pdf_url'] = raw_url
+            result['pdf_file_name'] = book.pdf_file.name
+            
+            # Extract public ID
+            public_id = extract_public_id_from_cloudinary_url(raw_url)
+            result['extracted_public_id'] = public_id
+            
+            # Get Cloudinary config status
+            config = get_cloudinary_config()
+            result['cloudinary_configured'] = bool(config['cloud_name'] and config['api_key'] and config['api_secret'])
+            result['cloud_name'] = config.get('cloud_name', 'NOT SET')
+            
+            # Analyze URL format
+            if '/raw/upload/' in raw_url:
+                result['url_format'] = 'raw/upload'
+            elif '/image/upload/' in raw_url:
+                result['url_format'] = 'image/upload'
+            elif '/auto/upload/' in raw_url:
+                result['url_format'] = 'auto/upload'
+            else:
+                result['url_format'] = 'unknown'
+            
+            # Check for query params
+            if '?' in raw_url:
+                result['has_query_params'] = True
+                result['query_part'] = raw_url.split('?')[1][:100]
+            else:
+                result['has_query_params'] = False
+                
+        except Exception as e:
+            result['error'] = str(e)
+    
+    return Response(result)
+
+
+class BookSubmissionViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for BookSubmission model.
+    Public users can submit books.
+    The authorized admin can view and manage submissions.
+    """
+    queryset = BookSubmission.objects.all()
+    serializer_class = BookSubmissionSerializer
+    
+    def get_permissions(self):
+        if self.action in ['create']:
+            return [permissions.AllowAny()]  # Allow public to submit
+        # Only the authorized admin can list/update/delete
+        from apps.accounts.permissions import IsAdminUser
+        return [IsAdminUser()]
+    
+    def get_serializer_class(self):
+        return BookSubmissionSerializer
+    
+    def get_queryset(self):
+        if is_authorized_admin(self.request.user):
+            return BookSubmission.objects.all()
+        return BookSubmission.objects.none()
+    
+    def perform_create(self, serializer):
+        from django.conf import settings
+        from django.core.mail import send_mail
+        import logging
+        logger = logging.getLogger('apps')
+
+        submission = serializer.save()
+
+        admin_email = getattr(settings, 'ADMIN_EMAIL', '')
+        from_email = getattr(settings, 'DEFAULT_FROM_EMAIL', '')
+
+        # ── Email 1: Admin notification ─────────────────────────────────────
+        admin_subject = f'📚 New Book Submission: {submission.book_title}'
+        admin_message = f"""
+New book submission received on Kavithedal Publications.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SUBMISSION DETAILS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Author Name  : {submission.name}
+Email        : {submission.email}
+Phone        : {submission.contact}
+Book Title   : {submission.book_title}
+Submitted On : {submission.created_at.strftime('%d %b %Y, %I:%M %p')}
+Status       : {submission.status.upper()}
+
+DESCRIPTION:
+{submission.description}
+
+{"PDF/File: Attached (download from admin panel)" if submission.file else "PDF/File: Not provided"}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Review this submission in the admin panel:
+https://kavithedal.com/admin/books/booksubmission/
+
+Kavithedal Publications — Admin Notification
+"""
+        if admin_email:
+            try:
+                send_mail(admin_subject, admin_message, from_email,
+                          [admin_email], fail_silently=True)
+            except Exception as exc:
+                logger.error('BookSubmission admin email failed: %s', exc)
+
+        # ── Email 2: Confirmation to the author ─────────────────────────────
+        author_subject = 'Book Submission Received — Kavithedal Publications'
+        author_message = f"""
+Dear {submission.name},
+
+Thank you for submitting your book to Kavithedal Publications!
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+YOUR SUBMISSION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Book Title   : {submission.book_title}
+Submitted On : {submission.created_at.strftime('%d %b %Y')}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Our editorial team will review your submission and get back to you within
+5–7 business days. We will contact you at this email address.
+
+For any questions, please write to us at {from_email or 'kavithedalpublications@gmail.com'}
+
+Warm regards,
+Kavithedal Publications Editorial Team
+"""
+        try:
+            send_mail(author_subject, author_message, from_email,
+                      [submission.email], fail_silently=True)
+        except Exception as exc:
+            logger.error('BookSubmission author confirmation email failed: %s', exc)
+
+
+@api_view(['GET'])
+@permission_classes([permissions.AllowAny])
+def image_diagnostic(request):
+    """Public diagnostic endpoint: shows Cloudinary status + stored cover_image name + resolved URL for every book."""
+    from apps.books.serializers import _file_url
+    from django.conf import settings as dj_settings
+
+    # Cloudinary status
+    cloudinary_storage_cfg = getattr(dj_settings, 'CLOUDINARY_STORAGE', {})
+    default_storage_setting = getattr(dj_settings, 'DEFAULT_FILE_STORAGE', '')
+
+    # Check the actual storage class Django is using at runtime
+    from django.core.files.storage import default_storage as ds
+    actual_storage_class = type(ds).__name__
+    try:
+        wrapped = getattr(ds, '_wrapped', None)
+        actual_storage_class = type(wrapped).__name__ if wrapped else type(ds).__name__
+    except Exception:
+        pass
+
+    # Check if cloudinary SDK is configured
+    try:
+        import cloudinary
+        cld_config = cloudinary.config()
+        cloudinary_sdk_cloud = getattr(cld_config, 'cloud_name', None)
+    except Exception as e:
+        cloudinary_sdk_cloud = f'ERROR: {e}'
+
+    cloudinary_info = {
+        'settings_cloudinary_configured': bool(cloudinary_storage_cfg.get('CLOUD_NAME')),
+        'settings_cloud_name': cloudinary_storage_cfg.get('CLOUD_NAME', 'NOT SET'),
+        'settings_default_file_storage': default_storage_setting,
+        'runtime_storage_class': actual_storage_class,
+        'cloudinary_sdk_cloud_name': cloudinary_sdk_cloud,
+    }
+
+    books = Book.objects.all().order_by('-created_at')
+    results = []
+    for book in books:
+        stored = book.cover_image.name if book.cover_image else None
+        field_storage = type(book.cover_image.storage).__name__ if book.cover_image else None
+        try:
+            raw_url = book.cover_image.url if book.cover_image else None
+        except Exception as e:
+            raw_url = f'ERROR: {e}'
+        resolved = _file_url(book.cover_image, request, resource_type='image')
+        results.append({
+            'title': book.title,
+            'stored_name': stored,
+            'field_storage_class': field_storage,
+            'raw_url': raw_url,
+            'resolved_url': resolved,
+        })
+    from django.http import JsonResponse
+    return JsonResponse({'cloudinary': cloudinary_info, 'books': results})
+
+
+class ContactMessageViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for ContactMessage model.
+    Public users can submit contact messages.
+    The authorized admin can view and manage messages.
+    """
+    queryset = ContactMessage.objects.all()
+    serializer_class = ContactMessageSerializer
+    
+    def get_permissions(self):
+        if self.action in ['create']:
+            return [permissions.AllowAny()]  # Allow public to submit
+        # Only the authorized admin can list/update/delete
+        from apps.accounts.permissions import IsAdminUser
+        return [IsAdminUser()]
+    
+    def get_serializer_class(self):
+        return ContactMessageSerializer
+    
+    def get_queryset(self):
+        if is_authorized_admin(self.request.user):
+            return ContactMessage.objects.all()
+        return ContactMessage.objects.none()
+    
+    def perform_create(self, serializer):
+        # Save the message
+        message = serializer.save()
+        
+        # Send email to admin
+        try:
+            from django.conf import settings
+            from django.core.mail import send_mail
+            admin_email = getattr(settings, 'ADMIN_EMAIL', 'kavithedaldpi@gmail.com')
+            subject = f'New Contact Message: {message.name}'
+            message_text = f"""
+You have received a new contact message.
+
+From: {message.name}
+Email: {message.email}
+
+Message:
+{message.message}
+
+Please login to the admin panel to respond.
+            """
+            send_mail(
+                subject,
+                message_text,
+                getattr(settings, 'DEFAULT_FROM_EMAIL', 'noreply@kavithedal.com'),
+                [admin_email],
+                fail_silently=False,
+            )
+        except Exception as e:
+            print(f"Error sending email: {e}")

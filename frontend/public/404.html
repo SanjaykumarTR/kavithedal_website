@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Kavithedal Publications</title>
+  <script>
+    // SPA fallback: preserve the full path and redirect to index.html
+    // React Router will then handle the route client-side.
+    (function() {
+      var path = window.location.pathname;
+      var search = window.location.search;
+      var hash = window.location.hash;
+      
+      // Store full redirect URL including query params and hash
+      var fullPath = path + search + hash;
+      
+      if (fullPath !== '/' && fullPath !== '') {
+        sessionStorage.setItem('spa_redirect', fullPath);
+      }
+      
+      // Redirect to root - React will handle the route
+      window.location.replace('/');
+    })();
+  </script>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0;
+    }
+    .loading {
+      color: white;
+      text-align: center;
+    }
+    .loading-spinner {
+      border: 3px solid rgba(255,255,255,0.3);
+      border-radius: 50%;
+      border-top-color: white;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 1rem;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <div class="loading">
+    <div class="loading-spinner"></div>
+    <p>Loading...</p>
+  </div>
+</body>
+</html>

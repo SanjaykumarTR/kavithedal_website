@@ -1,0 +1,263 @@
+/* Authors Page Styles */
+.authors-page {
+  padding: 40px 20px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.authors-page .section-title {
+  text-align: center;
+  margin-bottom: 40px;
+  font-size: 2rem;
+  color: #333;
+}
+
+.authors-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 30px;
+}
+
+.author-card {
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  text-align: center;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.author-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}
+
+.author-card img {
+  width: 150px;
+  height: 150px;
+  border-radius: 50%;
+  object-fit: cover;
+  margin-bottom: 15px;
+  border: 3px solid #f0f0f0;
+}
+
+.author-card-info h3 {
+  margin: 10px 0;
+  color: #333;
+  font-size: 1.3rem;
+}
+
+.author-bio {
+  color: #666;
+  font-size: 0.9rem;
+  margin: 10px 0;
+  line-height: 1.5;
+}
+
+.author-books-count {
+  display: inline-block;
+  background: #f5f5f5;
+  padding: 5px 15px;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  color: #555;
+  margin-top: 10px;
+}
+
+/* Author Detail Page Styles */
+.author-detail-page {
+  padding: 40px 20px;
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+.author-detail-loading,
+.author-detail-error {
+  text-align: center;
+  padding: 60px 20px;
+  font-size: 1.2rem;
+  color: #666;
+}
+
+.author-detail-header {
+  display: flex;
+  gap: 40px;
+  margin-bottom: 40px;
+  padding: 30px;
+  background: white;
+  border-radius: 15px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+
+.author-detail-photo img {
+  width: 250px;
+  height: 250px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 4px solid #f0f0f0;
+}
+
+.author-detail-info {
+  flex: 1;
+}
+
+.author-detail-info h1 {
+  font-size: 2.5rem;
+  color: #333;
+  margin-bottom: 10px;
+}
+
+.author-detail-email,
+.author-detail-mobile {
+  color: #666;
+  margin: 5px 0;
+  font-size: 1rem;
+}
+
+.author-detail-stats {
+  margin-top: 20px;
+}
+
+.author-detail-stats .author-books-count {
+  background: #27ae60;
+  color: white;
+  padding: 8px 20px;
+  font-size: 1rem;
+}
+
+.author-detail-bio {
+  background: white;
+  padding: 30px;
+  border-radius: 15px;
+  margin-bottom: 30px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+
+.author-detail-bio h2 {
+  font-size: 1.5rem;
+  color: #333;
+  margin-bottom: 15px;
+}
+
+.author-detail-bio p {
+  color: #555;
+  line-height: 1.8;
+  font-size: 1rem;
+}
+
+.author-detail-books {
+  background: white;
+  padding: 30px;
+  border-radius: 15px;
+  margin-bottom: 30px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+
+.author-detail-books h2 {
+  font-size: 1.5rem;
+  color: #333;
+  margin-bottom: 20px;
+}
+
+.Author-books-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 20px;
+}
+
+.author-book-card {
+  display: block;
+  text-decoration: none;
+  background: #f9f9f9;
+  border-radius: 10px;
+  overflow: hidden;
+  transition: transform 0.3s ease;
+}
+
+.author-book-card:hover {
+  transform: translateY(-5px);
+}
+
+.author-book-card img {
+  width: 100%;
+  height: 250px;
+  object-fit: cover;
+}
+
+.author-book-info {
+  padding: 15px;
+}
+
+.author-book-info h3 {
+  color: #333;
+  font-size: 1rem;
+  margin-bottom: 8px;
+}
+
+.book-price {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.original-price {
+  text-decoration: line-through;
+  color: #999;
+}
+
+.discounted-price {
+  color: #27ae60;
+  font-weight: bold;
+  font-size: 1.1rem;
+}
+
+.discount-badge {
+  background: #e74c3c;
+  color: white;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 0.8rem;
+}
+
+.no-books {
+  text-align: center;
+  color: #666;
+  padding: 20px;
+}
+
+.author-detail-back {
+  text-align: center;
+}
+
+.back-link {
+  display: inline-block;
+  padding: 12px 30px;
+  background: #333;
+  color: white;
+  text-decoration: none;
+  border-radius: 25px;
+  transition: background 0.3s ease;
+}
+
+.back-link:hover {
+  background: #555;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .author-detail-header {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+  
+  .author-detail-photo img {
+    width: 180px;
+    height: 180px;
+  }
+  
+  .author-detail-info h1 {
+    font-size: 1.8rem;
+  }
+}
